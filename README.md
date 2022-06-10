@@ -1,9 +1,7 @@
-# MeteoriteSimulator
-An supplementary project for the article
-
-# Publications
-
-### Numerical approach for constructing probabilistic estimations of the residual mass, impact point and other parameters of a meteorite by the light part of its path
+[DOI](http://dx.doi.org/10.1007/s10598-022-09544-3), Full text ([EN](https://rdcu.be/cMHpJ), [RU](https://cs.msu.ru/sites/cmc/files/docs/45_pdfsam_pmi_68_pechat_06.12.2021.pdf))
+### (2021) A Numerical Approach to Deriving Statistical Estimates of the Residual Mass, the Impact Point, and Other Meteorite Parameters from the Bright Section of the Trajectory
+*Maxim A. Krivov*\
+*Computational Mathematics and Modeling, vol. 32, pp. 428–437*
 
 The motion of a meteorite in the Earth's atmosphere might be uniquely determined by the system of ordinary differential equations, but to define it, two initial conditions and five coefficients must be provided. The paper presents an approach in which the values of such unknown data are selected from the range of physically based parameters and, after that, millions of generated ODEs are solved numerically. Among the generated virtual meteorites, 100 variants are chosen that best match the tabular data of velocity and height that, in their turn, are reconstructed from real photo-snapshots. Based on the selected virtual meteorites, probabilistic estimations are constructed for each unknown parameter and, in addition, the flight distance and residual mass. The concept of the proposed approach is illustrated by the example of the [Innisfree meteorite](http://articles.adsabs.harvard.edu/cgi-bin/nph-iarticle_query?1981Metic..16..153H&defaultprint=YES&filetype=.pdf):
 
@@ -17,3 +15,6 @@ The motion of a meteorite in the Earth's atmosphere might be uniquely determined
 | Drag force coefficient | 2.22 ± 3.8% | 2.14 ± 8% | 2.23 ± 12.2% | 2.07 ± 20.5% |
 | Lift force coefficient | 0.006 ± 80.1% | 0.012 ± 90% | 0.02 ± 93.8% | 0.034 ± 96.4% |
 | Enthalpy of destruction, MJ/kg | 9.0 ± 3.1% | 9.2 ± 7.7% | 9.1 ± 12.9% | 10.1 ± 21.4% |
+
+## Acknowledgements
+This work was supported by Russian Foundation for Basic Research (RFBR), grant 18-37-00429 mol_a.
