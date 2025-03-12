@@ -3,21 +3,22 @@
 
 #include "Meteorites.Core/ParameterSet.h"
 
+// Defines a distribution of unknown parameters adapted for some special cases
+enum class Distribution : uint32_t
+{
+  // Provides uniform parameters from ranges that are wide enough
+  // May be used to describe any unknown meteorite
+  UNIFORM_ANY = 0
+};
+
 class PossibleParameters
 {
   public:
-    enum SetID
-    {
-      // Provides parameters from ranges that are wide enough
-      // May be used to describe any unknown meteorite
-      UNIVERSAL = 0
-    };
-
     PossibleParameters() = delete;
     PossibleParameters(const PossibleParameters &) = delete;
     PossibleParameters &operator =(const PossibleParameters &) = delete;
 
-    static const ParameterSet &Get(SetID id);
+    static const ParameterSet &Get(Distribution id);
 
     static const std::vector<ParameterSet> &All();
 

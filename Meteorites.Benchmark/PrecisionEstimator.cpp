@@ -81,18 +81,16 @@ void PrecisionEstimator::CompareMethods(const Case &problem, real dt, std::ostre
   assert(dt <= 1e-1f);
 
   // Prepare data that we want to analyze
-  GoldSolver one_step(GoldSolver::ONE_STEP_ADAMS),
-             two_step(GoldSolver::TWO_STEP_ADAMS),
-             three_step(GoldSolver::THREE_STEP_ADAMS);
-  std::array<GoldSolver *, 3> solvers = { &one_step, &two_step, &three_step };
+  GoldSolver solver;
   BufferingFormatter fmt(0.0f);
   FakeFunctional f;
 
-  for (auto &solver : solvers)
-  {
-    solver->Configure(dt, TIMEOUT);
-    solver->Solve(problem, f, fmt);
-  }
+  solver.Configure(NumericalAlgorithm::ONE_STEP_ADAMS, dt, TIMEOUT);
+  solver.Solve(problem, f, fmt);
+  solver.Configure(NumericalAlgorithm::TWO_STEP_ADAMS, dt, TIMEOUT);
+  solver.Solve(problem, f, fmt);
+  solver.Configure(NumericalAlgorithm::THREE_STEP_ADAMS, dt, TIMEOUT);
+  solver.Solve(problem, f, fmt);
 
   decltype(auto) logs = fmt.Logs();
   assert(logs.size() == 3);
@@ -133,19 +131,19 @@ void PrecisionEstimator::CompareMethods(const Case &problem, real dt, std::ostre
 }
 
 void PrecisionEstimator::CompareSteps(const Case &problem,
-                                      GoldSolver::Method method,
+                                      NumericalAlgorithm method,
                                       std::ostream &str)
 {
   // Prepare data that we want to analyze
   FakeFunctional f;
-  GoldSolver solver(method);
+  GoldSolver solver;
   std::array<real, 6> steps{ (real)1e-1, (real)1e-2, (real)1e-3,
                              (real)1e-4, (real)1e-5, (real)1e-6 };
 
   BufferingFormatter fmt((real)0.0);
   for (real dt : steps)
   {
-    solver.Configure(dt, TIMEOUT);
+    solver.Configure(method, dt, TIMEOUT);
     solver.Solve(problem, f, fmt);
   }
   decltype(auto) logs = fmt.Logs();
@@ -182,13 +180,13 @@ void PrecisionEstimator::CompareSteps(const Case &problem,
 }
 
 void PrecisionEstimator::ComparePerturbations(const Case &p,
-                                              GoldSolver::Method method,
+                                              NumericalAlgorithm method,
                                               real dt, std::ostream &str)
 {
   // Prepare data that we want to analyze
   FakeFunctional f;
-  GoldSolver solver(method);
-  solver.Configure(dt, TIMEOUT);
+  GoldSolver solver;
+  solver.Configure(method, dt, TIMEOUT);
   std::array<real, 5> peturbations{ (real)0.01, (real)0.02, (real)0.04, (real)0.08, (real)0.16 };
 
   std::array<real, 9> params{ p.H(), p.Ch(), p.Rho(), p.Cd(), p.Cl(),

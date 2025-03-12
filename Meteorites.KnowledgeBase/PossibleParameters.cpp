@@ -6,13 +6,13 @@
 
 std::vector<ParameterSet> PossibleParameters::collection_;
 
-const ParameterSet &PossibleParameters::Get(SetID id)
+const ParameterSet &PossibleParameters::Get(Distribution id)
 {
   LazyInit();
-  if (id < 0 || id >= collection_.size())
+  if ((uint32_t)id >= collection_.size())
   { throw std::runtime_error("wrong type of parameter set"); }
 
-  return collection_[id];
+  return collection_[(uint32_t)id];
 }
 
 const std::vector<ParameterSet> &PossibleParameters::All()
@@ -35,6 +35,6 @@ void PossibleParameters::LazyInit()
       std::make_pair((real)0.0, (real)std::_Pi / 2)   // Gamma0
     );
     collection_.emplace_back(universal);
-    assert(collection_.size() == UNIVERSAL + 1);
+    assert(collection_.size() == (uint32_t)Distribution::UNIFORM_ANY + 1);
   }
 }

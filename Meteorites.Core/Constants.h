@@ -13,9 +13,17 @@ class Constants
     Constants(const Constants &) = delete;
     void operator =(const Constants &) = delete;
 
-    static real R();
-    static real g(real h);
-    static real g() { return g(0); }
+    static constexpr real R()
+    { return (real)6371000; }
+
+    static constexpr real g(real h)
+    {
+      real r_km = (6371 + h / 1000);
+      return ((real)(6.67428 * 5.9726) / (r_km * r_km) * (real)1e7);
+    }
+
+    static constexpr real g() { return g(0); }
+
     static real rho_a(real h);
     static real Midsection(real M, real rho);
 };

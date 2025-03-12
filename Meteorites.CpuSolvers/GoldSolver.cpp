@@ -40,8 +40,8 @@ class Layer
   public:
     Layer()
       : params_(nullptr),
-        V_(0.0f), gamma_(0.0f), h_(0.0f), M_(0.0f),
-        fV_(0.0f), fgamma_(0.0f), fh_(0.0f), fM_(0.0f)
+        V_(0.0f), gamma_(0.0f), h_(0.0f), l_(0.0f), M_(0.0f),
+        fV_(0.0f), fgamma_(0.0f), fh_(0.0f), fl_(0.0f), fM_(0.0f)
     { }
     Layer(const Layer &) = delete;
     Layer &operator =(const Layer &) = delete;
@@ -253,41 +253,23 @@ void AdamsMethod(const Case &problem, const IFunctional &functional, real dt, re
                    functional.Compute(timestamp, &V_arg[0], &h_arg[0]));
 }
 
-}
+} // unnamed namespace
 
-GoldSolver::GoldSolver(Method method)
-  : dt_((real)0.001), timeout_((real)1000.0)
-{
-  assert(method >= 1);
-  assert(method <= 3);
-  adams_steps_ = method;
-}
-
-void GoldSolver::Configure(real dt, real timeout)
-{
-  if (dt <= (real)0.0 || timeout < dt * (adams_steps_ + 1))
-  {
-    throw std::runtime_error("wrong time step and/or timeout");
-  }
-
-  dt_      = dt;
-  timeout_ = timeout;
-}
 
 void GoldSolver::Solve(const Case &problem, const IFunctional &functional, IResultFormatter &results)
 {
-  switch (adams_steps_)
+  switch (AdamsSteps())
   {
     case 1:
-      AdamsMethod<1>(problem, functional, dt_, timeout_, results);
+      AdamsMethod<1>(problem, functional, Dt(), Timeout(), results);
       break;
 
     case 2:
-      AdamsMethod<2>(problem, functional, dt_, timeout_, results);
+      AdamsMethod<2>(problem, functional, Dt(), Timeout(), results);
       break;
 
     case 3:
-      AdamsMethod<3>(problem, functional, dt_, timeout_, results);
+      AdamsMethod<3>(problem, functional, Dt(), Timeout(), results);
       break;
 
     default:

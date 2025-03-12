@@ -6,6 +6,15 @@
 #include "ResultFormatters.h"
 #include "ICaseGenerator.h"
 
+// The known numerical methods that may be used to solve ODEs
+enum class NumericalAlgorithm : uint32_t
+{
+  ONE_STEP_ADAMS     = 0,
+  TWO_STEP_ADAMS     = 1,
+  THREE_STEP_ADAMS   = 2
+};
+
+
 // Basic interface for the solvers of any type
 // They uses some numerical algorithm to compute the body's trajectory and parameters
 class ISolver
@@ -16,7 +25,7 @@ class ISolver
 
     // Specializes our solver
     // This method is optional, some values are already used by default
-    virtual void Configure(real dt, real timeout) = 0;
+    virtual void Configure(NumericalAlgorithm alg, real dt, real timeout) = 0;
 
     // Solves single problem, computes functional value and sends solution to formatter
     virtual void Solve(const Case &problem,

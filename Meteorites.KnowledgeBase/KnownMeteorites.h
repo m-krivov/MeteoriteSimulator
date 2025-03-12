@@ -6,23 +6,26 @@
 class KnownMeteorites
 {
   public:
-    enum MeteoriteID
+    enum class ID : uint32_t
     {
-      INNISFREE = 0
+      PRIBRAM   = 0,
+      LOST_CITY = 1,
+      INNISFREE = 2,
+      KOSICE    = 3
     };
 
     KnownMeteorites() = delete;
     KnownMeteorites(const KnownMeteorites &) = delete;
-    void operator =(const KnownMeteorites &) = delete;
+    KnownMeteorites &operator =(const KnownMeteorites &) = delete;
 
-    static const IMeteorite *Get(MeteoriteID id);
+    static const IMeteorite *Get(ID id);
 
     static const std::vector<const IMeteorite *> &All();
 
   private:
     static struct Collection
     {
-      std::unordered_map<MeteoriteID, std::unique_ptr<IMeteorite> > meteorites;
+      std::unordered_map<ID, std::unique_ptr<IMeteorite> > meteorites;
       std::vector<const IMeteorite *> enumeration;
     } collection_;
 

@@ -15,8 +15,8 @@ class PrecisionEstimator
     void CompareMethods(const Case &problem, real dt, std::ostream &str);
 
     // Estimates the effect of 'dt' on the numerical error
-    void CompareSteps(const Case &problem, GoldSolver::Method method, std::ostream &str);
+    void CompareSteps(const Case &problem, NumericalAlgorithm method, std::ostream &str);
 
     // Estimates the effect of peturbation for each initial parameter
-    void ComparePerturbations(const Case &problem, GoldSolver::Method method, real dt, std::ostream &str);
+    void ComparePerturbations(const Case &problem, NumericalAlgorithm method, real dt, std::ostream &str);
 };
