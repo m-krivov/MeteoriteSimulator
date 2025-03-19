@@ -32,7 +32,7 @@ void PossibleParameters::LazyInit()
       std::make_pair((real)0.5, (real)2.5),           // Cd
       std::make_pair((real)0.0, (real)0.25),          // Cl
       std::make_pair((real)10.0, (real)500.0),        // M0
-      std::make_pair((real)0.0, (real)std::_Pi / 2)   // Gamma0
+      std::make_pair((real)0.0, (real)M_PI / 2)   // Gamma0
     );
     collection_.emplace_back(universal);
     assert(collection_.size() == (uint32_t)Distribution::UNIFORM_ANY + 1);

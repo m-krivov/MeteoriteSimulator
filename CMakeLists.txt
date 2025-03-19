@@ -58,8 +58,16 @@ macro(configure_cpp_proj target proj_name)
     endforeach(i)
   endif()
 
-  add_custom_command(TARGET ${target} POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}> "${BIN_DIR}")
+  get_target_property(target_type ${target} TYPE)
+  if(target_type STREQUAL "EXECUTABLE" OR
+     target_type STREQUAL "SHARED_LIBRARY" OR
+     target_type STREQUAL "MODULE_LIBRARY")
+    add_custom_command(TARGET ${target} POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}> "${BIN_DIR}")
+  endif()
+  if(MSVC AND target_type STREQUAL "EXECUTABLE")
+    set_property(TARGET ${target} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${BIN_DIR}")
+  endif()
 endmacro()
 
 

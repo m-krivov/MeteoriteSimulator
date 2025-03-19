@@ -13,7 +13,7 @@ constexpr auto PARAMETERS        = Distribution::UNIFORM_ANY;
 constexpr uint32_t SEED          = 25102018;
 constexpr real TIMEOUT           = (real)60.0 * 30;
 
-constexpr size_t STAGE1_N_TOTAL  = 100000000;
+constexpr size_t STAGE1_N_TOTAL  = 100000;
 constexpr size_t STAGE1_N_TOP    = 100;
 constexpr auto   STAGE1_METHOD   = NumericalAlgorithm::TWO_STEP_ADAMS;
 constexpr real   STAGE1_DT       = (real)1e-3;
@@ -22,7 +22,7 @@ constexpr auto   STAGE2_METHOD   = NumericalAlgorithm::THREE_STEP_ADAMS;
 constexpr real   STAGE2_DT       = (real)1e-4;
 
 
-int main(int argc, char argv[])
+int main(int argc, char *argv[])
 {
   using clock = std::chrono::high_resolution_clock;
 
@@ -30,6 +30,7 @@ int main(int argc, char argv[])
   decltype(auto) params    = PossibleParameters::Get(PARAMETERS);
   auto progress_callback = [](float) -> void {
     std::cout << '#';
+    std::cout.flush();
   };
 
   // For the first stage, we don't want to simulate meteorite flight till the end
@@ -92,6 +93,7 @@ int main(int argc, char argv[])
       {
         on_progress += good_cases.size() / 100;
         std::cout << "#";
+        std::cout.flush();
       }
       solver.Solve(good_cases[i].first, functional, csv_fmt);
     }

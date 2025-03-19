@@ -10,9 +10,16 @@ constexpr real TIME_POINT   = (real)0.9;
 
 std::string ToString(float value)
 {
-  char buf[1024];
-  buf[sprintf_s(buf, "%e", value)] = '\0';
-  return std::string(buf);
+  std::ostringstream oss;
+  oss << std::scientific << value;
+  return oss.str();
+}
+
+std::string ToString(double value)
+{
+  std::ostringstream oss;
+  oss << std::scientific << value;
+  return oss.str();
 }
 
 // For each log, determines the number of record that corresponds to normalized 'time'
@@ -56,13 +63,6 @@ std::vector<size_t> GetTimePoints(const std::vector<BufferingFormatter::Log> &lo
   return res;
 }
 
-std::string ToString(double value)
-{
-  char buf[1024];
-  buf[sprintf_s(buf, "%le", value)] = '\0';
-  return std::string(buf);
-}
-
 real Eps(real value, real reference)
 {
   assert(reference > (real)0.0);
@@ -71,7 +71,7 @@ real Eps(real value, real reference)
 
 real ToDegrees(real rads)
 {
-  return (real)(rads / std::_Pi * 180);
+  return (real)(rads / M_PI * 180);
 }
 
 } // unnamed namespace

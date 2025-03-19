@@ -1,7 +1,5 @@
 #include "Constants.h"
 
-#define PI (real)3.1415926535897932384626433832795
-
 real Constants::rho_a(real h)
 {
   constexpr real rho_0 = (real)1.125;
@@ -11,6 +9,6 @@ real Constants::rho_a(real h)
 
 real Constants::Midsection(real M, real rho)
 {
-  static const real coeff = (real)(PI * std::pow(3.0 / (4.0 * PI), 2.0 / 3.0));
+  static const real coeff = (real)(M_PI * std::pow(3.0 / (4.0 * M_PI), 2.0 / 3.0));
   return coeff * std::pow(M / rho, (real)(2.0 / 3.0));
 }

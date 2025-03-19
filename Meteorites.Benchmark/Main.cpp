@@ -5,7 +5,7 @@
 
 #include <iostream>
 
-void main()
+int main()
 {
   size_t points = 0;
   const real *t = nullptr, *v = nullptr, *h = nullptr;

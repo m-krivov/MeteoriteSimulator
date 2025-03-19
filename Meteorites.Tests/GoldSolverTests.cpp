@@ -45,7 +45,7 @@ TEST_F(GoldTests, Vacuum_VerticalSpeed)
   GoldSolver solver;
   solver.Configure(NumericalAlgorithm::ONE_STEP_ADAMS, dt_sim, 3600.0f);
   Case problem(1.0f, 0.0f, 2000.0f, 0.0f, 0.0f,
-                1.0f, 0.5f, 1000.0f, (real)std::_Pi / 2);
+                1.0f, 0.5f, 1000.0f, (real)M_PI / 2);
   FakeFunctional f;
   BufferingFormatter fmt(0.1f);
 
@@ -99,7 +99,7 @@ TEST_F(GoldTests, Atmosphere_BrakingForce)
   for (auto Cd : { 0.0f, 0.5f, 1.0f, 1.5f, 2.0f })
   {
     Case problem(1.0f, 0.0f, 2000.0f, Cd, 0.0f,
-                  1.0f, 50.0f, 500.0f, -(real)std::_Pi / 4);
+                  1.0f, 50.0f, 500.0f, -(real)M_PI / 4);
     solver.Solve(problem, f, fmt);
   }
       
@@ -209,7 +209,7 @@ TEST_F(GoldTests, Method_TwoThreeSteps)
   problems.emplace_back(Case(1e6f, 0.35f, 3500.0f, 1.1f, 0.1f,
                               10.0f, 14e3f, 60e3f, 0.0f));
   problems.emplace_back(Case(0.5e6f, 0.5f, 2000.0f, 1.5f, 0.05f,
-                              5.0f, 10e3f, 55e3f, (real)std::_Pi / 9));
+                              5.0f, 10e3f, 55e3f, (real)M_PI / 9));
   for (auto &problem : problems)
   {
     BufferingFormatter fmt(0.01f);
@@ -242,7 +242,7 @@ TEST_F(GoldTests, Method_Precision)
 {
   GoldSolver solver;
   Case problem(0.5e6f, 0.1f, 4000.0f, 1.0f, 0.01f,
-                25.0f, 5e3f, 30e3f, (real)std::_Pi / 4);
+                25.0f, 5e3f, 30e3f, (real)M_PI / 4);
   FakeFunctional f;
   BufferingFormatter fmt(0.01f);
   for (auto dt : { 1e-3f, 1e-4f, 1e-5f })
