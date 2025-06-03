@@ -3,7 +3,10 @@
 #include "Meteorites.Core/Case.h"
 #include "Meteorites.Core/Functionals.h"
 #include "Meteorites.Core/ResultFormatters.h"
+#include "CudaStructures.cu"
 
 template <unsigned int STEPS, unsigned int ITERS>
-void CudaAdamsMethod(const std::vector<Case> &problem_vector, const IFunctional &functional, real dt, real timeout,
-                     IResultFormatter &results);
+void CudaLauncher(ThreadContext<STEPS, ITERS>* dev_thread_sandbox_arr, CudaCase* dev_problems,
+                  size_t promblems_vector_size, real dt, real timeout, real* dev_timestamps, size_t n_timestamps,
+                  real* dev_functional_args, Record* dev_records, unsigned int* dev_active_threads,
+                  unsigned int launching_blocks, unsigned int launching_threads_per_block);
