@@ -1,6 +1,7 @@
 #include "CudaAdamsMethod.h"
+
 #include "GPUParameters.h"
-#include "CudaStructures.cu"
+#include "CudaStructures.h"
 
 template <unsigned int STEPS, unsigned int ITERS>
 __device__ void UniStepAdams(ThreadContext<STEPS, ITERS>& c, size_t nxt, real dt);

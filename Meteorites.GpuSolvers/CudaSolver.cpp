@@ -1,4 +1,5 @@
 #include "CudaSolver.h"
+
 #include "CudaManager.h"
 #include "GPUParameters.h"
 
@@ -35,8 +36,8 @@ void CudaSolver::Solve(ICaseGenerator& generator, const IFunctional& functional,
 {
   std::vector<Case> problems_vector;
   Case problem;
-  // while (generator.Next(problem)) {
-  for (int i = 0; i < CASE_NUM; i++) {
+  //while (generator.Next(problem)) {
+  for (unsigned int i = 0; i < CASE_NUM; i++) {
     generator.Next(problem);
     problems_vector.emplace_back(std::move(problem));
   }

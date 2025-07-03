@@ -1,9 +1,6 @@
 #pragma once
 
-#include "Meteorites.Core/Case.h"
-#include "Meteorites.Core/Functionals.h"
-#include "Meteorites.Core/ResultFormatters.h"
-#include "CudaStructures.cu"
+#include "CudaStructures.h"
 
 template <unsigned int STEPS, unsigned int ITERS>
 void CudaLauncher(ThreadContext<STEPS, ITERS>* dev_thread_sandbox_arr, CudaCase* dev_problems,
