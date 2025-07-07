@@ -59,3 +59,24 @@ void CudaSolver::Solve(ICaseGenerator& generator, const IFunctional& functional,
     assert(false);
   }
 }
+
+void CudaSolver::Solve(const Case &problem, const IFunctional& functional, IResultFormatter& results)
+{
+  std::vector<Case> problems_vector = {problem};
+  switch (AdamsSteps()) {
+  case 1:
+    CudaManager<1u, ITERS_PER_KERNEL>(problems_vector, functional, Dt(), Timeout(), results);
+    break;
+
+  case 2:
+    CudaManager<2u, ITERS_PER_KERNEL>(problems_vector, functional, Dt(), Timeout(), results);
+    break;
+
+  case 3:
+    CudaManager<3u, ITERS_PER_KERNEL>(problems_vector, functional, Dt(), Timeout(), results);
+    break;
+
+  default:
+    assert(false);
+  }
+}

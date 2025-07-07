@@ -16,17 +16,14 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
 
   cudaDeviceProp prop;
   HANDLE_ERROR(cudaGetDeviceProperties(&prop, 0));
-  unsigned int launching_blocks = prop.multiProcessorCount * BLOCKS_PER_SM;
   unsigned int launching_threads_per_block = THREADS_PER_BLOCK;
-  // unsigned int cases_per_thread = problems_vector.size() / launching_blocks / launching_threads_per_block;
   unsigned int cases_per_thread = CASES_PER_THREAD;
-  unsigned int count_of_threads = launching_blocks * launching_threads_per_block;
+  unsigned int launching_blocks = ((problems_vector.size() - 1) / cases_per_thread / launching_threads_per_block) + 1;
+  unsigned int count_of_threads = problems_vector.size() / CASES_PER_THREAD; // effective threads
   printf("\nGPU: %s\nConfig:\n>Blocks: %u\n>Threads per block: %u\n>Cases per thread: %u\nTotal threads:%u\nTotal "
          "cases:%lu\n",
-         prop.name, launching_blocks, launching_threads_per_block, cases_per_thread, count_of_threads,
-         problems_vector.size());
-  printf("\nDid you update parameters in GPUParameters.h? If yes tap any key to continue...\n");
-  getchar();
+         prop.name, launching_blocks, launching_threads_per_block, cases_per_thread,
+         launching_threads_per_block * launching_blocks, problems_vector.size());
 
   // preparing buffers
 

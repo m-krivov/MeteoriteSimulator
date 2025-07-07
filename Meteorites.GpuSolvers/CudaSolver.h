@@ -11,10 +11,8 @@ class CudaSolver : public ISolver
 
   CudaSolver() : adams_steps_(1), dt_((real)0.001), timeout_((real)1000.0) { /*nothing*/ }
 
-  // Solve() for one Case isn't needed for GPU
   // ISolver method
-  virtual void Solve(const Case& problem, const IFunctional& functional,
-                     IResultFormatter& results) final { /*nothing*/ };
+  virtual void Solve(const Case& problem, const IFunctional& functional, IResultFormatter& results) final;
 
   // ISolver method
   virtual void Solve(ICaseGenerator& generator, const IFunctional& functional, IResultFormatter& results) final;

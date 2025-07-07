@@ -98,6 +98,9 @@ __global__ void AdamsKernel(ThreadContext<STEPS, ITERS>* contexts, CudaCase* pro
                             unsigned int* active_threads)
 {
   size_t grid_idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (grid_idx * CASES_PER_THREAD >= CASE_NUM) return;
+
   ThreadContext<STEPS, ITERS>& c = contexts[grid_idx];
 
   if (c.ended) {
