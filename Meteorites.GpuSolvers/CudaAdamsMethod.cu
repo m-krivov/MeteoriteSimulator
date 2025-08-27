@@ -6,7 +6,7 @@
 template <unsigned int STEPS, unsigned int ITERS>
 __device__ void UniStepAdams(ThreadContext<STEPS, ITERS>& c, size_t nxt, real dt);
 
-__device__ void OneStepAdams(Layer& res, const Layer& f0, real dt, CudaCase& params)
+__device__ void OneStepAdams(Layer& res, const Layer& f0, real dt, Case& params)
 {
   res.Set(f0.V_ + f0.fV_ * dt, f0.gamma_ + f0.fgamma_ * dt, f0.h_ + f0.fh_ * dt, f0.l_ + f0.fl_ * dt,
           f0.M_ + f0.fM_ * dt, params);
@@ -17,7 +17,7 @@ template <> __device__ void UniStepAdams(ThreadContext<1, ITERS_PER_KERNEL>& c, 
   OneStepAdams(c.steps[nxt], c.steps[(nxt + 1) & 1], dt, c.params);
 }
 
-__device__ void TwoStepAdams(Layer& res, const Layer& f1, const Layer& f0, real dt, CudaCase& params)
+__device__ void TwoStepAdams(Layer& res, const Layer& f1, const Layer& f0, real dt, Case& params)
 {
   const auto c1 = (real)1.5;
   const auto c0 = -(real)0.5;
@@ -32,7 +32,7 @@ template <> __device__ void UniStepAdams(ThreadContext<2, ITERS_PER_KERNEL>& c, 
   TwoStepAdams(c.steps[nxt], c.steps[(nxt + 1) % 3], c.steps[(nxt + 2) % 3], dt, c.params);
 }
 
-__device__ void ThreeStepAdams(Layer& res, const Layer& f2, const Layer& f1, const Layer& f0, real dt, CudaCase& params)
+__device__ void ThreeStepAdams(Layer& res, const Layer& f2, const Layer& f1, const Layer& f0, real dt, Case& params)
 {
   const auto c2 = (real)23 / 12;
   const auto c1 = -(real)16 / 12;
@@ -51,12 +51,12 @@ template <> __device__ void UniStepAdams(ThreadContext<3, ITERS_PER_KERNEL>& c, 
 }
 
 template <unsigned int STEPS, unsigned int ITERS>
-__device__ void InitContext(ThreadContext<STEPS, ITERS>& c, CudaCase& curr_case, real dt, size_t grid_idx,
+__device__ void InitContext(ThreadContext<STEPS, ITERS>& c, Case& curr_case, real dt, size_t grid_idx,
                             Record*& curr_record)
 {
   c.params = curr_case;
-  c.steps[STEPS].Set(curr_case.v0_, curr_case.gamma0_, curr_case.h0_, 0.0, // Case::l0()
-                     curr_case.m0_, c.params);
+  c.steps[STEPS].Set(curr_case.V0, curr_case.Gamma0, curr_case.h0, curr_case.l0,
+                     curr_case.M0, c.params);
   *curr_record = {
       0.0, c.steps[STEPS].M_, c.steps[STEPS].V_, c.steps[STEPS].h_, c.steps[STEPS].l_, c.steps[STEPS].gamma_};
   curr_record++;
@@ -93,7 +93,7 @@ __device__ void InitContext(ThreadContext<STEPS, ITERS>& c, CudaCase& curr_case,
 }
 
 template <unsigned int STEPS, unsigned int ITERS>
-__global__ void AdamsKernel(ThreadContext<STEPS, ITERS>* contexts, CudaCase* problems, real dt, real timeout,
+__global__ void AdamsKernel(ThreadContext<STEPS, ITERS>* contexts, Case* problems, real dt, real timeout,
                             real* timestamps, size_t n_timestamps, real* functional_args, Record* records,
                             unsigned int* active_threads)
 {
@@ -112,7 +112,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS, ITERS>* contexts, CudaCase* pro
     return;
   }
 
-  CudaCase& current_case = problems[grid_idx * CASES_PER_THREAD + c.curr_case_num];
+  Case& current_case = problems[grid_idx * CASES_PER_THREAD + c.curr_case_num];
   Record* curr_record = records + ITERS_PER_KERNEL * grid_idx;
   real t;
   real *V_arg, *h_arg;
@@ -172,7 +172,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS, ITERS>* contexts, CudaCase* pro
 };
 
 template <unsigned int STEPS, unsigned int ITERS>
-void CudaLauncher(ThreadContext<STEPS, ITERS>* dev_thread_sandbox_arr, CudaCase* dev_problems,
+void CudaLauncher(ThreadContext<STEPS, ITERS>* dev_thread_sandbox_arr, Case* dev_problems,
                   size_t promblems_vector_size, real dt, real timeout, real* dev_timestamps, size_t n_timestamps,
                   real* dev_functional_args, Record* dev_records, unsigned int* dev_active_threads,
                   unsigned int launching_blocks, unsigned int launching_threads_per_block)
@@ -185,19 +185,19 @@ void CudaLauncher(ThreadContext<STEPS, ITERS>* dev_thread_sandbox_arr, CudaCase*
 
 // template-specified functions compiles only this way
 template void CudaLauncher<1u, ITERS_PER_KERNEL>(ThreadContext<1u, ITERS_PER_KERNEL>* dev_thread_sandbox_arr,
-                                                 CudaCase* dev_problems, size_t promblems_vector_size, real dt,
+                                                 Case* dev_problems, size_t promblems_vector_size, real dt,
                                                  real timeout, real* dev_timestamps, size_t n_timestamps,
                                                  real* dev_functional_args, Record* dev_records,
                                                  unsigned int* dev_active_threads, unsigned int launching_blocks,
                                                  unsigned int launching_threads_per_block);
 template void CudaLauncher<2u, ITERS_PER_KERNEL>(ThreadContext<2u, ITERS_PER_KERNEL>* dev_thread_sandbox_arr,
-                                                 CudaCase* dev_problems, size_t promblems_vector_size, real dt,
+                                                 Case* dev_problems, size_t promblems_vector_size, real dt,
                                                  real timeout, real* dev_timestamps, size_t n_timestamps,
                                                  real* dev_functional_args, Record* dev_records,
                                                  unsigned int* dev_active_threads, unsigned int launching_blocks,
                                                  unsigned int launching_threads_per_block);
 template void CudaLauncher<3u, ITERS_PER_KERNEL>(ThreadContext<3u, ITERS_PER_KERNEL>* dev_thread_sandbox_arr,
-                                                 CudaCase* dev_problems, size_t promblems_vector_size, real dt,
+                                                 Case* dev_problems, size_t promblems_vector_size, real dt,
                                                  real timeout, real* dev_timestamps, size_t n_timestamps,
                                                  real* dev_functional_args, Record* dev_records,
                                                  unsigned int* dev_active_threads, unsigned int launching_blocks,

@@ -40,13 +40,13 @@ real CsvFromatter::Started(const Case &problem)
     throw std::runtime_error(ss.str());
   }
 
-  file_ << "Cd:,"     << problem.Cd()     << "," << std::endl;
-  file_ << "Cl:,"     << problem.Cl()     << "," << std::endl;
-  file_ << "Ch:,"     << problem.Ch()     << "," << std::endl;
-  file_ << "H:,"      << problem.H()      << "," << std::endl;
-  file_ << "Rho:,"    << problem.Rho()    << "," << std::endl;
-  file_ << "Gamma0:," << problem.Gamma0() << "," << std::endl;
-  file_ << "M0:,"     << problem.M0()     << "," << std::endl;
+  file_ << "Cd:,"     << problem.Cd     << "," << std::endl;
+  file_ << "Cl:,"     << problem.Cl     << "," << std::endl;
+  file_ << "Ch:,"     << problem.Ch     << "," << std::endl;
+  file_ << "H:,"      << problem.H      << "," << std::endl;
+  file_ << "Rho:,"    << problem.Rho    << "," << std::endl;
+  file_ << "Gamma0:," << problem.Gamma0 << "," << std::endl;
+  file_ << "M0:,"     << problem.M0     << "," << std::endl;
   file_ << std::endl;
   file_ << "Time," << "Mass," << "Velocity," << "Height," << "Distance," << "Gamma," << std::endl;
 

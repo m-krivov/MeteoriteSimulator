@@ -3,10 +3,7 @@
 #include "CudaAdamsMethod.h"
 #include "CudaStructures.h"
 #include "GPUParameters.h"
-#include "CudaHandleError.h"
-#include "CudaUniquePtr.h"
 
-#include <memory>
 
 template <unsigned int STEPS, unsigned int ITERS>
 void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& functional, real dt, real timeout,
@@ -31,9 +28,9 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
   auto dev_thread_sandbox_arr = cuda_make_unique<ThreadContext<STEPS, ITERS>>(count_of_threads);
 
   // problems (read-only)
-  auto dev_problems = cuda_make_unique<CudaCase>(problems_vector.size());
+  auto dev_problems = cuda_make_unique<Case>(problems_vector.size());
   HANDLE_ERROR(
-      cudaMemcpy(dev_problems.get(), problems_vector.data(), sizeof(CudaCase) * problems_vector.size(), cudaMemcpyHostToDevice)); // damn reinterpret cast
+      cudaMemcpy(dev_problems.get(), problems_vector.data(), sizeof(Case) * problems_vector.size(), cudaMemcpyHostToDevice)); // damn reinterpret cast
 
   // meteorite's timestamps (read-only)
   const real* timestamps = nullptr;
@@ -100,8 +97,7 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
           rec_i = 0;
           records_idx++;
           if (records_idx == records.size()) {
-            std::cout << "logically impossible error: uncompleted case\n";
-            break;
+            throw std::runtime_error("logically impossible error: uncompleted case");
           }
           rec_block = records[records_idx].get() + thread_idx * ITERS_PER_KERNEL;
         }

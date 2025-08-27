@@ -17,8 +17,8 @@ constexpr auto PARAMETERS        = Distribution::UNIFORM_ANY;
 constexpr uint32_t SEED          = 25102018;
 constexpr real TIMEOUT           = (real)60.0 * 30;
 
-constexpr size_t STAGE1_N_TOTAL  = 100000;
-constexpr size_t STAGE1_N_TOP    = 100;
+constexpr size_t STAGE1_N_TOTAL  = 1000;
+constexpr size_t STAGE1_N_TOP    = 5;
 constexpr auto   STAGE1_METHOD   = NumericalAlgorithm::TWO_STEP_ADAMS;
 constexpr real   STAGE1_DT       = (real)1e-3;
 
@@ -57,8 +57,8 @@ int main()
   std::cout << "     Method: " << (uint32_t)STAGE1_METHOD << "-step Adams" << std::endl;
   std::cout << "     dt:     " << STAGE1_DT << " seconds" << std::endl;
   std::cout << "Progress: ";
-  std::vector<std::pair<Case, double> > cuda_good_cases;
-  auto cuda_started = clock::now();
+  std::vector<std::pair<Case, double> > good_cases;
+  auto started = clock::now();
   {
     MonteCarloGenerator cases(*meteorite, params, STAGE1_N_TOTAL, SEED);
     cases.OnProgress(progress_callback, 0.01f);
@@ -69,20 +69,20 @@ int main()
     cuda_solver.Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
     cuda_solver.Solve(cases, functional, meta_fmt);
 
-    meta_fmt.ExportAndReset(cuda_good_cases);
-    assert(cuda_good_cases.size() == STAGE1_N_TOP);
+    meta_fmt.ExportAndReset(good_cases);
+    assert(good_cases.size() == STAGE1_N_TOP);
   }
-  auto cuda_ended = clock::now();
+  auto ended = clock::now();
   std::cout << std::endl;
-  std::cout << "Done in " << std::chrono::duration_cast<std::chrono::minutes>(cuda_ended - cuda_started).count()
+  std::cout << "Done in " << std::chrono::duration_cast<std::chrono::minutes>(ended - started).count()
             << " minutes" << std::endl << std::endl;
-
+  
 
   //CPU
 
   // Stage 1.
   // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteorites, select 'STAGE1_N_TOTAL' best of them
-  std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
+  /*std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
   std::cout << std::endl;
   std::cout << "     Cases:  " << STAGE1_N_TOTAL   << " pcs" << std::endl;
   std::cout << "     Method: " << (uint32_t)STAGE1_METHOD << "-step Adams" << std::endl;
@@ -107,7 +107,7 @@ int main()
   std::cout << std::endl;
   std::cout << "Done in " << std::chrono::duration_cast<std::chrono::minutes>(ended - started).count()
             << " minutes" << std::endl << std::endl;
-
+            */
   // Stage 2.
   // Recompute them with better precision, store as tables
   std::cout << "Stage 2. Recomputing trajectories of the best virtual meteorites with high precision";

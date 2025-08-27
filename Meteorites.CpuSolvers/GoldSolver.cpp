@@ -11,11 +11,11 @@ class Unchangeable
 {
   public:
     Unchangeable(const Case &problem)
-      : H_{ problem.H() },
-        Ch_{ problem.Ch() },
-        Cd_{ problem.Cd() },
-        Cl_{ problem.Cl() },
-        rho_{ problem.Rho() },
+      : H_{ problem.H },
+        Ch_{ problem.Ch },
+        Cd_{ problem.Cd },
+        Cl_{ problem.Cl },
+        rho_{ problem.Rho },
         R_{ Constants::R() }
     { }
     Unchangeable(const Unchangeable &) = delete;
@@ -73,7 +73,7 @@ class Layer
         auto sin_gamma = std::sin(gamma_);
         auto cos_gamma = std::cos(gamma_);
         auto g = Constants::g(h_);
-        auto rho_a = Constants::rho_a(h_);
+        auto rho_a = Constants::RhoAtm(h_);
         auto midsection = Constants::Midsection(M_, params_->Rho());
 
         fV_ = -params_->Cd() * rho_a * V_ * V_ * midsection / (2 * M_)
@@ -141,9 +141,9 @@ void UniStepAdams<2>(std::array<Layer, 3> &f, size_t nxt, real dt) {
 
 void ThreeStepAdams(Layer &res, const Layer &f2, const Layer &f1, const Layer &f0, real dt)
 {
-  const auto c2 =  (real)23 / 12;
-  const auto c1 = -(real)16 / 12;
-  const auto c0 =  (real)5  / 12;
+  constexpr auto c2 =  (real)23 / 12;
+  constexpr auto c1 = -(real)16 / 12;
+  constexpr auto c0 =  (real)5  / 12;
   
   res.Set(f2.V()     + ( c2 * f2.fV()     + c1 * f1.fV()     + c0 * f0.fV()     ) * dt,
           f2.Gamma() + ( c2 * f2.fGamma() + c1 * f1.fGamma() + c0 * f0.fGamma() ) * dt,
@@ -176,8 +176,8 @@ void AdamsMethod(const Case &problem, const IFunctional &functional, real dt, re
   real t = (real)0.0;
 
   // Compute values for initial steps
-  steps[STEPS].Set(problem.V0(), problem.Gamma0(),
-                   problem.h0(), problem.l0(), problem.M0());
+  steps[STEPS].Set(problem.V0, problem.Gamma0,
+                   problem.h0, problem.l0, problem.M0);
   t_next = results.Store(t, steps[STEPS].M(), steps[STEPS].V(),
                          steps[STEPS].h(), steps[STEPS].l(), steps[STEPS].Gamma());
 
@@ -186,14 +186,14 @@ void AdamsMethod(const Case &problem, const IFunctional &functional, real dt, re
   t_next = results.Store(t, steps[STEPS - 1].M(), steps[STEPS - 1].V(),
                          steps[STEPS - 1].h(), steps[STEPS - 1].l(), steps[STEPS - 1].Gamma());
   
-  if (STEPS >= 2) {
+  if constexpr (STEPS >= 2) {
     TwoStepAdams(steps[STEPS - 2], steps[STEPS - 1], steps[STEPS], dt);
     t += dt;
     t_next = results.Store(t, steps[STEPS - 2].M(), steps[STEPS - 2].V(),
                            steps[STEPS - 2].h(), steps[STEPS - 2].l(), steps[STEPS - 2].Gamma());
   }
 
-  if (STEPS >= 3) {
+  if constexpr (STEPS >= 3) {
     ThreeStepAdams(steps[STEPS - 3], steps[STEPS - 2], steps[STEPS - 1], steps[STEPS], dt);
     t += dt;
     t_next = results.Store(t, steps[STEPS - 3].M(), steps[STEPS - 3].V(),
