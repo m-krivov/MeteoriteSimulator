@@ -22,17 +22,24 @@ class ISolver
   public:
     ISolver(const ISolver &) = delete;
     ISolver &operator =(const ISolver &) = delete;
+    virtual ~ISolver() = default;
 
     // Specializes our solver
     // This method is optional, some values are already used by default
     virtual void Configure(NumericalAlgorithm alg, real dt, real timeout) = 0;
 
-    // Solves single problem, computes functional value and sends solution to formatter
+    // Solves a single problem, computes functional value and sends solution to formatter
     virtual void Solve(const Case &problem,
                        const IFunctional &functional,
                        IResultFormatter &results) = 0;
 
-    // Finds solutions for the set of problems
+    // Finds solutions for the fixed-size set of problems
+    // This version may be parallelized
+    virtual void Solve(const std::vector<Case> &problems,
+                       const IFunctional &functional,
+                       IResultFormatter &results) = 0;
+
+    // Finds solutions for the problems represented by a stream
     // This version may be parallelized
     virtual void Solve(ICaseGenerator &generator,
                        const IFunctional &functional,

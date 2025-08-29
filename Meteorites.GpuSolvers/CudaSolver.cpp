@@ -60,6 +60,11 @@ void CudaSolver::Solve(ICaseGenerator& generator, const IFunctional& functional,
   }
 }
 
+void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &functional, IResultFormatter &results)
+{
+  throw std::runtime_error("not implemented yet");
+}
+
 void CudaSolver::Solve(const Case &problem, const IFunctional& functional, IResultFormatter& results)
 {
   std::vector<Case> problems_vector = {problem};

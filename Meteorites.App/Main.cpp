@@ -51,7 +51,7 @@ int main()
   //GPU
 
   // Stage 1.
-  std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
+  /*std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
   std::cout << std::endl;
   std::cout << "     Cases:  " << STAGE1_N_TOTAL   << " pcs" << std::endl;
   std::cout << "     Method: " << (uint32_t)STAGE1_METHOD << "-step Adams" << std::endl;
@@ -75,14 +75,13 @@ int main()
   auto ended = clock::now();
   std::cout << std::endl;
   std::cout << "Done in " << std::chrono::duration_cast<std::chrono::minutes>(ended - started).count()
-            << " minutes" << std::endl << std::endl;
-  
+            << " minutes" << std::endl << std::endl;*/
 
   //CPU
 
   // Stage 1.
   // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteorites, select 'STAGE1_N_TOTAL' best of them
-  /*std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
+  std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
   std::cout << std::endl;
   std::cout << "     Cases:  " << STAGE1_N_TOTAL   << " pcs" << std::endl;
   std::cout << "     Method: " << (uint32_t)STAGE1_METHOD << "-step Adams" << std::endl;
@@ -96,9 +95,9 @@ int main()
     L2Functional functional(*meteorite);
     MetaFormatter meta_fmt(STAGE1_N_TOP, STAGE1_N_TOP * 10);
 
-    GoldSolver solver;
-    solver.Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
-    solver.Solve(cases, functional, meta_fmt);
+    std::unique_ptr<ISolver> solver(new GoldSolver());
+    solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
+    solver->Solve(cases, functional, meta_fmt);
     
     meta_fmt.ExportAndReset(good_cases);
     assert(good_cases.size() == STAGE1_N_TOP);
@@ -107,7 +106,7 @@ int main()
   std::cout << std::endl;
   std::cout << "Done in " << std::chrono::duration_cast<std::chrono::minutes>(ended - started).count()
             << " minutes" << std::endl << std::endl;
-            */
+            
   // Stage 2.
   // Recompute them with better precision, store as tables
   std::cout << "Stage 2. Recomputing trajectories of the best virtual meteorites with high precision";

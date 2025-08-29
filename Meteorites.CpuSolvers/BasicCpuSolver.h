@@ -8,21 +8,29 @@ class BasicCpuSolver : public ISolver
 {
   public:
     // ISolver method
-    virtual void Configure(NumericalAlgorithm alg, real dt, real timeout) final;
+    virtual void Configure(NumericalAlgorithm alg, real dt, real timeout) override final;
+
+    // ISolver method
+    virtual void Solve(const std::vector<Case> &problems,
+                       const IFunctional &functional,
+                       IResultFormatter &results) override;
+
+    // ISolver method
+    virtual void Solve(ICaseGenerator &generator,
+                       const IFunctional &functional,
+                       IResultFormatter &results) override;
 
   protected:
-    BasicCpuSolver()
-      : adams_steps_(1), dt_((real)0.001), timeout_((real)1000.0)
-    { /*nothing*/ }
+    BasicCpuSolver() = default;
 
-    size_t AdamsSteps() const { return adams_steps_; }
+    NumericalAlgorithm Algoritm() const { return algorithm_; }
 
     real Dt() const { return dt_; }
 
     real Timeout() const { return timeout_; }
 
   private:
-    size_t adams_steps_;
-    real dt_;
-    real timeout_;
+    NumericalAlgorithm algorithm_ = NumericalAlgorithm::ONE_STEP_ADAMS;
+    real dt_ = (real)0.001;
+    real timeout_ = (real)1000.0;
 };

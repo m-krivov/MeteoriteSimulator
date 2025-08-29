@@ -3,6 +3,14 @@
 
 #include <cuda_runtime.h>
 
+// Retarget helper functions to device
+#if defined(__CUDA_ARCH__)
+  #if defined(DEVICE)
+    #undef DEVICE
+  #endif
+  #define DEVICE __device__
+#endif
+
 
 static inline void HandleError(cudaError_t err, const char* file, int line)
 {

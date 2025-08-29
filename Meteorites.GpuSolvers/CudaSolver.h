@@ -2,6 +2,7 @@
 #include "Meteorites.Core/Defs.h"
 #include "Meteorites.Core/ISolver.h"
 
+
 // Implements some common logic that is used by CPU solvers
 class CudaSolver : public ISolver
 {
@@ -12,10 +13,13 @@ class CudaSolver : public ISolver
   CudaSolver() : adams_steps_(1), dt_((real)0.001), timeout_((real)1000.0) { /*nothing*/ }
 
   // ISolver method
-  virtual void Solve(const Case& problem, const IFunctional& functional, IResultFormatter& results) final;
+  virtual void Solve(const Case& problem, const IFunctional& functional, IResultFormatter& results) override final;
 
   // ISolver method
-  virtual void Solve(ICaseGenerator& generator, const IFunctional& functional, IResultFormatter& results) final;
+  virtual void Solve(const std::vector<Case> &problems, const IFunctional &functional, IResultFormatter &results) override final;
+
+  // ISolver method
+  virtual void Solve(ICaseGenerator& generator, const IFunctional& functional, IResultFormatter& results) override final;
 
   size_t AdamsSteps() const { return adams_steps_; }
 

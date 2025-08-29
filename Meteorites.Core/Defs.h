@@ -20,3 +20,8 @@ typedef double real;
 #if !defined(M_PI)
 constexpr double M_PI = 3.1415926535897932384626433832795;
 #endif
+
+// Stub for CUDA solvers
+#if !defined(DEVICE)
+  #define DEVICE
+#endif

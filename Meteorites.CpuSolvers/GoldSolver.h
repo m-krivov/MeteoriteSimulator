@@ -13,10 +13,5 @@ class GoldSolver : public BasicCpuSolver
     // ISolver method
     virtual void Solve(const Case &problem,
                        const IFunctional &functional,
-                       IResultFormatter &results) final;
-
-    // ISolver method
-    virtual void Solve(ICaseGenerator &generator,
-                       const IFunctional &functional,
-                       IResultFormatter &results) final;
+                       IResultFormatter &results) override final;
 };

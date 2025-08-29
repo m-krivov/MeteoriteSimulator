@@ -25,7 +25,7 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
   // preparing buffers
 
   // thread contexts
-  auto dev_thread_sandbox_arr = cuda_make_unique<ThreadContext<STEPS, ITERS>>(count_of_threads);
+  auto dev_thread_sandbox_arr = cuda_make_unique<ThreadContext<STEPS>>(count_of_threads);
 
   // problems (read-only)
   auto dev_problems = cuda_make_unique<Case>(problems_vector.size());

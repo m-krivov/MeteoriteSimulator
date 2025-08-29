@@ -1,99 +1,54 @@
 #include "CudaAdamsMethod.h"
 
+#include "Meteorites.Core/Adams.h"
+
 #include "GPUParameters.h"
 #include "CudaStructures.h"
 
-template <unsigned int STEPS, unsigned int ITERS>
-__device__ void UniStepAdams(ThreadContext<STEPS, ITERS>& c, size_t nxt, real dt);
-
-__device__ void OneStepAdams(Layer& res, const Layer& f0, real dt, Case& params)
-{
-  res.Set(f0.V_ + f0.fV_ * dt, f0.gamma_ + f0.fgamma_ * dt, f0.h_ + f0.fh_ * dt, f0.l_ + f0.fl_ * dt,
-          f0.M_ + f0.fM_ * dt, params);
-}
-
-template <> __device__ void UniStepAdams(ThreadContext<1, ITERS_PER_KERNEL>& c, size_t nxt, real dt)
-{
-  OneStepAdams(c.steps[nxt], c.steps[(nxt + 1) & 1], dt, c.params);
-}
-
-__device__ void TwoStepAdams(Layer& res, const Layer& f1, const Layer& f0, real dt, Case& params)
-{
-  const auto c1 = (real)1.5;
-  const auto c0 = -(real)0.5;
-
-  res.Set(f1.V_ + (c1 * f1.fV_ + c0 * f0.fV_) * dt, f1.gamma_ + (c1 * f1.fgamma_ + c0 * f0.fgamma_) * dt,
-          f1.h_ + (c1 * f1.fh_ + c0 * f0.fh_) * dt, f1.l_ + (c1 * f1.fl_ + c0 * f0.fl_) * dt,
-          f1.M_ + (c1 * f1.fM_ + c0 * f0.fM_) * dt, params);
-}
-
-template <> __device__ void UniStepAdams(ThreadContext<2, ITERS_PER_KERNEL>& c, size_t nxt, real dt)
-{
-  TwoStepAdams(c.steps[nxt], c.steps[(nxt + 1) % 3], c.steps[(nxt + 2) % 3], dt, c.params);
-}
-
-__device__ void ThreeStepAdams(Layer& res, const Layer& f2, const Layer& f1, const Layer& f0, real dt, Case& params)
-{
-  const auto c2 = (real)23 / 12;
-  const auto c1 = -(real)16 / 12;
-  const auto c0 = (real)5 / 12;
-
-  res.Set(f2.V_ + (c2 * f2.fV_ + c1 * f1.fV_ + c0 * f0.fV_) * dt,
-          f2.gamma_ + (c2 * f2.fgamma_ + c1 * f1.fgamma_ + c0 * f0.fgamma_) * dt,
-          f2.h_ + (c2 * f2.fh_ + c1 * f1.fh_ + c0 * f0.fh_) * dt,
-          f2.l_ + (c2 * f2.fl_ + c1 * f1.fl_ + c0 * f0.fl_) * dt,
-          f2.M_ + (c2 * f2.fM_ + c1 * f1.fM_ + c0 * f0.fM_) * dt, params);
-}
-
-template <> __device__ void UniStepAdams(ThreadContext<3, ITERS_PER_KERNEL>& c, size_t nxt, real dt)
-{
-  ThreeStepAdams(c.steps[nxt], c.steps[(nxt + 1) & 3], c.steps[(nxt + 2) & 3], c.steps[(nxt + 3) & 3], dt, c.params);
-}
-
-template <unsigned int STEPS, unsigned int ITERS>
-__device__ void InitContext(ThreadContext<STEPS, ITERS>& c, Case& curr_case, real dt, size_t grid_idx,
+template <unsigned int STEPS>
+__device__ void InitContext(ThreadContext<STEPS>& c, Case& curr_case, real dt, size_t grid_idx,
                             Record*& curr_record)
 {
-  c.params = curr_case;
-  c.steps[STEPS].Set(curr_case.V0, curr_case.Gamma0, curr_case.h0, curr_case.l0,
-                     curr_case.M0, c.params);
+  Adams::Unchangeable params(curr_case);
+  Adams::SetLayer(c.steps[STEPS], params,
+                  curr_case.V0, curr_case.Gamma0, curr_case.h0, curr_case.l0, curr_case.M0);
   *curr_record = {
-      0.0, c.steps[STEPS].M_, c.steps[STEPS].V_, c.steps[STEPS].h_, c.steps[STEPS].l_, c.steps[STEPS].gamma_};
+      0.0, c.steps[STEPS].M, c.steps[STEPS].V, c.steps[STEPS].h, c.steps[STEPS].l, c.steps[STEPS].Gamma};
   curr_record++;
 
-  OneStepAdams(c.steps[STEPS - 1], c.steps[STEPS], dt, c.params);
+  Adams::OneStepIteration(c.steps[STEPS - 1], c.steps[STEPS], params, dt);
   *curr_record = {dt,
-                  c.steps[STEPS - 1].M_,
-                  c.steps[STEPS - 1].V_,
-                  c.steps[STEPS - 1].h_,
-                  c.steps[STEPS - 1].l_,
-                  c.steps[STEPS - 1].gamma_};
+                  c.steps[STEPS - 1].M,
+                  c.steps[STEPS - 1].V,
+                  c.steps[STEPS - 1].h,
+                  c.steps[STEPS - 1].l,
+                  c.steps[STEPS - 1].Gamma};
   curr_record++;
-  if (STEPS >= 2) {
-    TwoStepAdams(c.steps[STEPS - 2], c.steps[STEPS - 1], c.steps[STEPS], dt, c.params);
+  if constexpr (STEPS >= 2) {
+    Adams::TwoStepIteration(c.steps[STEPS - 2], c.steps[STEPS - 1], c.steps[STEPS], params, dt);
     *curr_record = {dt * 2,
-                    c.steps[STEPS - 2].M_,
-                    c.steps[STEPS - 2].V_,
-                    c.steps[STEPS - 2].h_,
-                    c.steps[STEPS - 2].l_,
-                    c.steps[STEPS - 2].gamma_};
+                    c.steps[STEPS - 2].M,
+                    c.steps[STEPS - 2].V,
+                    c.steps[STEPS - 2].h,
+                    c.steps[STEPS - 2].l,
+                    c.steps[STEPS - 2].Gamma};
     curr_record++;
   }
 
-  if (STEPS >= 3) {
-    ThreeStepAdams(c.steps[STEPS - 3], c.steps[STEPS - 2], c.steps[STEPS - 1], c.steps[STEPS], dt, c.params);
+  if constexpr (STEPS >= 3) {
+    Adams::ThreeStepIteration(c.steps[STEPS - 3], c.steps[STEPS - 2], c.steps[STEPS - 1], c.steps[STEPS], params, dt);
     *curr_record = {dt * 3,
-                    c.steps[STEPS - 3].M_,
-                    c.steps[STEPS - 3].V_,
-                    c.steps[STEPS - 3].h_,
-                    c.steps[STEPS - 3].l_,
-                    c.steps[STEPS - 3].gamma_};
+                    c.steps[STEPS - 3].M,
+                    c.steps[STEPS - 3].V,
+                    c.steps[STEPS - 3].h,
+                    c.steps[STEPS - 3].l,
+                    c.steps[STEPS - 3].Gamma};
     curr_record++;
   }
 }
 
 template <unsigned int STEPS, unsigned int ITERS>
-__global__ void AdamsKernel(ThreadContext<STEPS, ITERS>* contexts, Case* problems, real dt, real timeout,
+__global__ void AdamsKernel(ThreadContext<STEPS>* contexts, Case* problems, real dt, real timeout,
                             real* timestamps, size_t n_timestamps, real* functional_args, Record* records,
                             unsigned int* active_threads)
 {
@@ -101,7 +56,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS, ITERS>* contexts, Case* problem
 
   if (grid_idx * CASES_PER_THREAD >= CASE_NUM) return;
 
-  ThreadContext<STEPS, ITERS>& c = contexts[grid_idx];
+  ThreadContext<STEPS>& c = contexts[grid_idx];
 
   if (c.ended) {
     return;
@@ -120,6 +75,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS, ITERS>* contexts, Case* problem
   unsigned int iters_count;
 
   // restore context
+  Adams::Unchangeable params(current_case);
   if (c.t == 0.0) { // new case
     InitContext(c, current_case, dt, grid_idx, curr_record);
     t = dt * (real)STEPS;
@@ -141,18 +97,18 @@ __global__ void AdamsKernel(ThreadContext<STEPS, ITERS>* contexts, Case* problem
     // If necessery, update the functional's arguments
     if (timestamp < n_timestamps && t >= timestamps[timestamp]) {
       const auto& step = c.steps[(nxt + 1) % (STEPS + 1)];
-      V_arg[timestamp] = step.V_;
-      h_arg[timestamp] = step.h_;
+      V_arg[timestamp] = step.V;
+      h_arg[timestamp] = step.h;
       timestamp++;
     }
 
     // Compute values for the next step, store them
-    UniStepAdams<STEPS, ITERS>(c, nxt, dt);
-    auto M = c.steps[nxt].M_;
-    auto h = c.steps[nxt].h_;
+    Adams::Iteration<STEPS>(c.steps, params, nxt, dt);
+    auto M = c.steps[nxt].M;
+    auto h = c.steps[nxt].h;
 
     t += dt;
-    *curr_record = {t, M, c.steps[nxt].V_, h, c.steps[nxt].l_, c.steps[nxt].gamma_};
+    *curr_record = {t, M, c.steps[nxt].V, h, c.steps[nxt].l, c.steps[nxt].Gamma};
 
     // Check, should we stop the simulation?
     if (M <= (real)0.01 || h <= (real)0.0 || t >= timeout) {
@@ -172,7 +128,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS, ITERS>* contexts, Case* problem
 };
 
 template <unsigned int STEPS, unsigned int ITERS>
-void CudaLauncher(ThreadContext<STEPS, ITERS>* dev_thread_sandbox_arr, Case* dev_problems,
+void CudaLauncher(ThreadContext<STEPS>* dev_thread_sandbox_arr, Case* dev_problems,
                   size_t promblems_vector_size, real dt, real timeout, real* dev_timestamps, size_t n_timestamps,
                   real* dev_functional_args, Record* dev_records, unsigned int* dev_active_threads,
                   unsigned int launching_blocks, unsigned int launching_threads_per_block)
@@ -184,19 +140,19 @@ void CudaLauncher(ThreadContext<STEPS, ITERS>* dev_thread_sandbox_arr, Case* dev
 }
 
 // template-specified functions compiles only this way
-template void CudaLauncher<1u, ITERS_PER_KERNEL>(ThreadContext<1u, ITERS_PER_KERNEL>* dev_thread_sandbox_arr,
+template void CudaLauncher<1u, ITERS_PER_KERNEL>(ThreadContext<1u>* dev_thread_sandbox_arr,
                                                  Case* dev_problems, size_t promblems_vector_size, real dt,
                                                  real timeout, real* dev_timestamps, size_t n_timestamps,
                                                  real* dev_functional_args, Record* dev_records,
                                                  unsigned int* dev_active_threads, unsigned int launching_blocks,
                                                  unsigned int launching_threads_per_block);
-template void CudaLauncher<2u, ITERS_PER_KERNEL>(ThreadContext<2u, ITERS_PER_KERNEL>* dev_thread_sandbox_arr,
+template void CudaLauncher<2u, ITERS_PER_KERNEL>(ThreadContext<2u>* dev_thread_sandbox_arr,
                                                  Case* dev_problems, size_t promblems_vector_size, real dt,
                                                  real timeout, real* dev_timestamps, size_t n_timestamps,
                                                  real* dev_functional_args, Record* dev_records,
                                                  unsigned int* dev_active_threads, unsigned int launching_blocks,
                                                  unsigned int launching_threads_per_block);
-template void CudaLauncher<3u, ITERS_PER_KERNEL>(ThreadContext<3u, ITERS_PER_KERNEL>* dev_thread_sandbox_arr,
+template void CudaLauncher<3u, ITERS_PER_KERNEL>(ThreadContext<3u>* dev_thread_sandbox_arr,
                                                  Case* dev_problems, size_t promblems_vector_size, real dt,
                                                  real timeout, real* dev_timestamps, size_t n_timestamps,
                                                  real* dev_functional_args, Record* dev_records,

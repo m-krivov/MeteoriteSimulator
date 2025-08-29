@@ -2,31 +2,34 @@
 
 void BasicCpuSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
 {
-  size_t steps = 0;
-  switch (alg)
-  {
-    case NumericalAlgorithm::ONE_STEP_ADAMS:
-      steps = 1;
-      break;
+  if (alg != NumericalAlgorithm::ONE_STEP_ADAMS &&
+      alg != NumericalAlgorithm::TWO_STEP_ADAMS &&
+      alg != NumericalAlgorithm::THREE_STEP_ADAMS)
+  { throw std::runtime_error("unsupported numerical algorithm"); }
 
-    case NumericalAlgorithm::TWO_STEP_ADAMS:
-      steps = 2;
-      break;
-
-    case NumericalAlgorithm::THREE_STEP_ADAMS:
-      steps = 3;
-      break;
-
-    default:
-      throw std::runtime_error("unsupported numerical algorithm");
-  }
-
-  if (dt <= (real)0.0 || timeout < dt * (steps + 1))
+  if (dt <= (real)0.0 || timeout < dt * 4) // 4 as an iteration of three-step Adams
   {
     throw std::runtime_error("wrong time step and/or timeout");
   }
 
-  adams_steps_ = steps;
+  algorithm_   = alg;
   dt_          = dt;
   timeout_     = timeout;
+}
+
+void BasicCpuSolver::Solve(const std::vector<Case> &problems,
+                           const IFunctional &functional,
+                           IResultFormatter &results)
+{
+  for (const auto &problem : problems)
+  { ((ISolver *)this)->Solve(problem, functional, results); }
+}
+
+void BasicCpuSolver::Solve(ICaseGenerator &generator,
+                           const IFunctional &functional,
+                           IResultFormatter &results)
+{
+  Case problem;
+  while (generator.Next(problem))
+  { ((ISolver *)this)->Solve(problem, functional, results); }
 }
