@@ -1,10 +1,9 @@
 #pragma once
 #include "Meteorites.Core/Defs.h"
-
 #include "Meteorites.Core/ISolver.h"
 
-// Implements some common logic that is used by CPU solvers 
-class BasicCpuSolver : public ISolver
+// Implements some common logic
+class BasicSolver : public ISolver
 {
   public:
     // ISolver method
@@ -21,9 +20,9 @@ class BasicCpuSolver : public ISolver
                        IResultFormatter &results) override;
 
   protected:
-    BasicCpuSolver() = default;
+    BasicSolver() = default;
 
-    NumericalAlgorithm Algoritm() const { return algorithm_; }
+    NumericalAlgorithm Algorithm() const { return algorithm_; }
 
     real Dt() const { return dt_; }
 

@@ -1,34 +1,20 @@
 #pragma once
 #include "Meteorites.Core/Defs.h"
-#include "Meteorites.Core/ISolver.h"
+#include "Meteorites.Core/BasicSolver.h"
 
 
 // Implements some common logic that is used by CPU solvers
-class CudaSolver : public ISolver
+class CudaSolver : public BasicSolver
 {
   public:
-  // ISolver method
-  virtual void Configure(NumericalAlgorithm alg, real dt, real timeout) final;
+    CudaSolver() = default;
 
-  CudaSolver() : adams_steps_(1), dt_((real)0.001), timeout_((real)1000.0) { /*nothing*/ }
+    // ISolver method
+    virtual void Solve(const Case& problem, const IFunctional& functional, IResultFormatter& results) override final;
 
-  // ISolver method
-  virtual void Solve(const Case& problem, const IFunctional& functional, IResultFormatter& results) override final;
+    // ISolver method
+    virtual void Solve(const std::vector<Case> &problems, const IFunctional &functional, IResultFormatter &results) override final;
 
-  // ISolver method
-  virtual void Solve(const std::vector<Case> &problems, const IFunctional &functional, IResultFormatter &results) override final;
-
-  // ISolver method
-  virtual void Solve(ICaseGenerator& generator, const IFunctional& functional, IResultFormatter& results) override final;
-
-  size_t AdamsSteps() const { return adams_steps_; }
-
-  real Dt() const { return dt_; }
-
-  real Timeout() const { return timeout_; }
-
-  private:
-  size_t adams_steps_;
-  real dt_;
-  real timeout_;
+    // ISolver method
+    virtual void Solve(ICaseGenerator& generator, const IFunctional& functional, IResultFormatter& results) override final;
 };

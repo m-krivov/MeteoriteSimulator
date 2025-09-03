@@ -3,7 +3,7 @@
 #include "CudaManager.h"
 #include "GPUParameters.h"
 
-void CudaSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
+/*void CudaSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
 {
   size_t steps = 0;
   switch (alg) {
@@ -30,58 +30,43 @@ void CudaSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
   adams_steps_ = steps;
   dt_ = dt;
   timeout_ = timeout;
-}
+}*/
 
 void CudaSolver::Solve(ICaseGenerator& generator, const IFunctional& functional, IResultFormatter& results)
 {
-  std::vector<Case> problems_vector;
+  std::vector<Case> problems;
   Case problem;
   //while (generator.Next(problem)) {
   for (unsigned int i = 0; i < CASE_NUM; i++) {
     generator.Next(problem);
-    problems_vector.emplace_back(std::move(problem));
+    problems.emplace_back(std::move(problem));
   }
-
-  switch (AdamsSteps()) {
-  case 1:
-    CudaManager<1u, ITERS_PER_KERNEL>(problems_vector, functional, Dt(), Timeout(), results);
-    break;
-
-  case 2:
-    CudaManager<2u, ITERS_PER_KERNEL>(problems_vector, functional, Dt(), Timeout(), results);
-    break;
-
-  case 3:
-    CudaManager<3u, ITERS_PER_KERNEL>(problems_vector, functional, Dt(), Timeout(), results);
-    break;
-
-  default:
-    assert(false);
-  }
+  Solve(problems, functional, results);
 }
 
 void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &functional, IResultFormatter &results)
 {
-  throw std::runtime_error("not implemented yet");
+  switch (Algorithm())
+  {
+    case NumericalAlgorithm::ONE_STEP_ADAMS:
+      CudaManager<1u, ITERS_PER_KERNEL>(problems, functional, Dt(), Timeout(), results);
+      break;
+
+    case NumericalAlgorithm::TWO_STEP_ADAMS:
+      CudaManager<2u, ITERS_PER_KERNEL>(problems, functional, Dt(), Timeout(), results);
+      break;
+
+    case NumericalAlgorithm::THREE_STEP_ADAMS:
+      CudaManager<3u, ITERS_PER_KERNEL>(problems, functional, Dt(), Timeout(), results);
+      break;
+
+    default:
+      assert(false);
+  }
 }
 
 void CudaSolver::Solve(const Case &problem, const IFunctional& functional, IResultFormatter& results)
 {
-  std::vector<Case> problems_vector = {problem};
-  switch (AdamsSteps()) {
-  case 1:
-    CudaManager<1u, ITERS_PER_KERNEL>(problems_vector, functional, Dt(), Timeout(), results);
-    break;
-
-  case 2:
-    CudaManager<2u, ITERS_PER_KERNEL>(problems_vector, functional, Dt(), Timeout(), results);
-    break;
-
-  case 3:
-    CudaManager<3u, ITERS_PER_KERNEL>(problems_vector, functional, Dt(), Timeout(), results);
-    break;
-
-  default:
-    assert(false);
-  }
+  std::vector<Case> problems = {problem};
+  Solve(problems, functional, results);
 }

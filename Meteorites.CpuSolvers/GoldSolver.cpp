@@ -11,8 +11,8 @@ void AdamsMethod(const Case &problem, const IFunctional &functional, real dt, re
                  IResultFormatter &results)
 {
   assert(1u <= STEPS && STEPS <= 3u);   // not adapted for other steps
-  assert(problem.M0() > (real)0.0);
-  assert(problem.V0() > (real)0.0);
+  assert(problem.M0 > (real)0.0);
+  assert(problem.V0 > (real)0.0);
   auto t_next = results.Started(problem);
 
   // Prepare the initial state and coefficients, verify them
@@ -104,7 +104,7 @@ void AdamsMethod(const Case &problem, const IFunctional &functional, real dt, re
 
 void GoldSolver::Solve(const Case &problem, const IFunctional &functional, IResultFormatter &results)
 {
-  switch (Algoritm())
+  switch (Algorithm())
   {
     case NumericalAlgorithm::ONE_STEP_ADAMS:
       AdamsMethod<1>(problem, functional, Dt(), Timeout(), results);

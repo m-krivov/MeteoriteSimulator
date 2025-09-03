@@ -1,7 +1,6 @@
 #include "CudaManager.h"
 
-#include "CudaAdamsMethod.h"
-#include "CudaStructures.h"
+#include "AdamsKernels.h"
 #include "GPUParameters.h"
 
 
@@ -9,19 +8,7 @@ template <unsigned int STEPS, unsigned int ITERS>
 void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& functional, real dt, real timeout,
                  IResultFormatter& results)
 {
-  // configure grids (make number of cases the main parameter)
-
-  cudaDeviceProp prop;
-  HANDLE_ERROR(cudaGetDeviceProperties(&prop, 0));
-  unsigned int launching_threads_per_block = THREADS_PER_BLOCK;
-  unsigned int cases_per_thread = CASES_PER_THREAD;
-  unsigned int launching_blocks = ((problems_vector.size() - 1) / cases_per_thread / launching_threads_per_block) + 1;
   unsigned int count_of_threads = problems_vector.size() / CASES_PER_THREAD; // effective threads
-  printf("\nGPU: %s\nConfig:\n>Blocks: %u\n>Threads per block: %u\n>Cases per thread: %u\nTotal threads:%u\nTotal "
-         "cases:%lu\n",
-         prop.name, launching_blocks, launching_threads_per_block, cases_per_thread,
-         launching_threads_per_block * launching_blocks, problems_vector.size());
-
   // preparing buffers
 
   // thread contexts
@@ -58,9 +45,8 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
   while (active_threads) {
     global_iter++;
 
-    CudaLauncher<STEPS, ITERS>(dev_thread_sandbox_arr.get(), dev_problems.get(), problems_vector.size(), dt, timeout,
-                               dev_timestamps.get(), n_timestamps, dev_functional_args.get(), dev_records.get(), dev_active_threads.get(),
-                               launching_blocks, launching_threads_per_block);
+    BatchedAdamsKernel<STEPS>(dev_thread_sandbox_arr.get(), dev_active_threads.get(), dev_problems.get(), problems_vector.size(), dt, timeout,
+                              dev_timestamps.get(), n_timestamps, dev_functional_args.get(), dev_records.get(), ITERS);
 
     cudaDeviceSynchronize();
 
@@ -84,8 +70,8 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
       auto t_next = results.Started(problems_vector[problem_idx]);
       Record* rec_block = records[records_idx].get() + thread_idx * ITERS_PER_KERNEL;
       for (unsigned int i = 0; i < STEPS + 1; i++) {
-        t_next = results.Store(rec_block[rec_i].t_, rec_block[rec_i].m_, rec_block[rec_i].v_, rec_block[rec_i].h_,
-                               rec_block[rec_i].l_, rec_block[rec_i].gamma_);
+        t_next = results.Store(rec_block[rec_i].t, rec_block[rec_i].M, rec_block[rec_i].V, rec_block[rec_i].h,
+                               rec_block[rec_i].l, rec_block[rec_i].Gamma);
         rec_i++;
       }
 
@@ -103,7 +89,7 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
         }
 
         // end of case's records
-        if (rec_block[rec_i].t_ == (real)0.0) {
+        if (rec_block[rec_i].t == (real)0.0) {
           real* V_args =
               functional_args.get() + (thread_idx * n_timestamps * 2 * CASES_PER_THREAD) + (n_timestamps * 2 * case_idx);
           real* h_args = V_args + n_timestamps;
@@ -111,9 +97,9 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
           while (timestamp < n_timestamps && V_args[timestamp] != (real)0.0) {
             timestamp++;
           };
-          if (rec_block[rec_i].m_ <= (real)0.01) {
+          if (rec_block[rec_i].M <= (real)0.01) {
             results.Finished(IResultFormatter::Reason::Burnt, functional.Compute(timestamp, V_args, h_args));
-          } else if (rec_block[rec_i].h_ <= (real)0.0) {
+          } else if (rec_block[rec_i].h <= (real)0.0) {
             results.Finished(IResultFormatter::Reason::Collided, functional.Compute(timestamp, V_args, h_args));
           } else {
             results.Finished(IResultFormatter::Reason::Timeouted, functional.Compute(timestamp, V_args, h_args));
@@ -124,9 +110,9 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
         }
 
         // store necessary record
-        if (rec_block[rec_i].t_ >= t_next) {
-          t_next = results.Store(rec_block[rec_i].t_, rec_block[rec_i].m_, rec_block[rec_i].v_, rec_block[rec_i].h_,
-                                 rec_block[rec_i].l_, rec_block[rec_i].gamma_);
+        if (rec_block[rec_i].t >= t_next) {
+          t_next = results.Store(rec_block[rec_i].t, rec_block[rec_i].M, rec_block[rec_i].V, rec_block[rec_i].h,
+                                 rec_block[rec_i].l, rec_block[rec_i].Gamma);
         }
 
         rec_i++;

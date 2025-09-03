@@ -1,6 +1,6 @@
-#include "BasicCpuSolver.h"
+#include "BasicSolver.h"
 
-void BasicCpuSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
+void BasicSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
 {
   if (alg != NumericalAlgorithm::ONE_STEP_ADAMS &&
       alg != NumericalAlgorithm::TWO_STEP_ADAMS &&
@@ -17,17 +17,17 @@ void BasicCpuSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
   timeout_     = timeout;
 }
 
-void BasicCpuSolver::Solve(const std::vector<Case> &problems,
-                           const IFunctional &functional,
-                           IResultFormatter &results)
+void BasicSolver::Solve(const std::vector<Case> &problems,
+                        const IFunctional &functional,
+                        IResultFormatter &results)
 {
   for (const auto &problem : problems)
   { ((ISolver *)this)->Solve(problem, functional, results); }
 }
 
-void BasicCpuSolver::Solve(ICaseGenerator &generator,
-                           const IFunctional &functional,
-                           IResultFormatter &results)
+void BasicSolver::Solve(ICaseGenerator &generator,
+                        const IFunctional &functional,
+                        IResultFormatter &results)
 {
   Case problem;
   while (generator.Next(problem))

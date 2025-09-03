@@ -51,7 +51,7 @@ int main()
   //GPU
 
   // Stage 1.
-  /*std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
+  std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
   std::cout << std::endl;
   std::cout << "     Cases:  " << STAGE1_N_TOTAL   << " pcs" << std::endl;
   std::cout << "     Method: " << (uint32_t)STAGE1_METHOD << "-step Adams" << std::endl;
@@ -75,13 +75,13 @@ int main()
   auto ended = clock::now();
   std::cout << std::endl;
   std::cout << "Done in " << std::chrono::duration_cast<std::chrono::minutes>(ended - started).count()
-            << " minutes" << std::endl << std::endl;*/
+            << " minutes" << std::endl << std::endl;
 
   //CPU
 
   // Stage 1.
   // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteorites, select 'STAGE1_N_TOTAL' best of them
-  std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
+  /*std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
   std::cout << std::endl;
   std::cout << "     Cases:  " << STAGE1_N_TOTAL   << " pcs" << std::endl;
   std::cout << "     Method: " << (uint32_t)STAGE1_METHOD << "-step Adams" << std::endl;
@@ -105,7 +105,7 @@ int main()
   auto ended = clock::now();
   std::cout << std::endl;
   std::cout << "Done in " << std::chrono::duration_cast<std::chrono::minutes>(ended - started).count()
-            << " minutes" << std::endl << std::endl;
+            << " minutes" << std::endl << std::endl;*/
             
   // Stage 2.
   // Recompute them with better precision, store as tables
