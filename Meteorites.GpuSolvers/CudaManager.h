@@ -5,6 +5,6 @@
 #include "Meteorites.Core/Functionals.h"
 #include "Meteorites.Core/ResultFormatters.h"
 
-template <unsigned int STEPS, unsigned int ITERS>
-void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& functional, real dt, real timeout,
-                 IResultFormatter& results);
+template <uint32_t STEPS>
+void CudaManager(const std::vector<Case> &problems, const IFunctional &functional,
+                 real dt, real timeout, IResultFormatter &results);

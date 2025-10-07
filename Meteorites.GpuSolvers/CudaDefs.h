@@ -28,18 +28,19 @@ struct CudaDeleter
 {
   void operator()(void* ptr) const
   {
-    if (ptr)
+    if (ptr != nullptr)
     { cudaFree(ptr); }
   }
 };
 
 template <typename T>
-using cuda_unique_ptr = std::unique_ptr<T, CudaDeleter>;
+using CudaPtr = std::unique_ptr<T, CudaDeleter>;
 
 template <typename T>
-cuda_unique_ptr<T> cuda_make_unique(size_t count)
+cudaError CudaAlloc(CudaPtr<T> &ptr, size_t count)
 {
-  T *ptr;
-  HANDLE_ERROR(cudaMalloc(&ptr, count * sizeof(T)));
-  return cuda_unique_ptr<T>(ptr);
+  T *tmp{};
+  auto ret = cudaMalloc(&tmp, count * sizeof(T));
+  ptr.reset(tmp);
+  return ret;
 }

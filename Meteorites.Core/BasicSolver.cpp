@@ -2,17 +2,31 @@
 
 void BasicSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
 {
-  if (alg != NumericalAlgorithm::ONE_STEP_ADAMS &&
-      alg != NumericalAlgorithm::TWO_STEP_ADAMS &&
-      alg != NumericalAlgorithm::THREE_STEP_ADAMS)
-  { throw std::runtime_error("unsupported numerical algorithm"); }
+  size_t steps{};
+  switch (alg) {
+    case NumericalAlgorithm::ONE_STEP_ADAMS:
+      steps = 1;
+    break;
 
-  if (dt <= (real)0.0 || timeout < dt * 4) // 4 as an iteration of three-step Adams
+    case NumericalAlgorithm::TWO_STEP_ADAMS:
+      steps = 2;
+    break;
+
+    case NumericalAlgorithm::THREE_STEP_ADAMS:
+      steps = 3;
+    break;
+
+    default:
+      throw std::runtime_error("unsupported numerical algorithm");
+  }
+
+  if (dt <= (real)0.0 || timeout < dt * (steps + 1))
   {
     throw std::runtime_error("wrong time step and/or timeout");
   }
 
   algorithm_   = alg;
+  steps_       = steps;
   dt_          = dt;
   timeout_     = timeout;
 }

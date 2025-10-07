@@ -5,7 +5,7 @@
 #include "Meteorites.Core/Adams.h"
 
 // Contains a few values extracted from Adams::Layer
-// They could be passed to fromatters
+// They could be passed to formatters
 struct Record
 {
   real t{}, M{}, V{}, h{}, l{}, Gamma{};
@@ -15,7 +15,11 @@ struct Record
   Record &operator =(const Record &) = default;
 
 #if !defined(NDEBUG)
-  void Print() { printf("Record: {t=%f, M=%f, V=%f, h=%f, l=%f, Gamma=%f\n", t, M, V, h, l, Gamma); }
+  void Print()
+  {
+    printf("Record: {t=%f, M=%f, V=%f, h=%f, l=%f, Gamma=%f\n",
+           (float)t, (float)M, (float)V, (float)h, (float)l, Gamma);
+  }
 #endif
 };
 
@@ -28,7 +32,7 @@ struct ThreadContext
   size_t nxt{};
   real t{};
   size_t timestamp{};
-  size_t curr_case_num{};
+  size_t cur_case{};
   bool ended{};
 
   ThreadContext() = default;

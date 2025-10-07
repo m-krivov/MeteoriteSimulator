@@ -64,18 +64,18 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_thr
   if (idx * CASES_PER_THREAD >= CASE_NUM)
   { return; }
 
-  ThreadContext<STEPS>& ctx = contexts[idx];
+  ThreadContext<STEPS> &ctx = contexts[idx];
   if (ctx.ended)
   { return; }
 
-  if (ctx.curr_case_num == CASES_PER_THREAD)
+  if (ctx.cur_case == CASES_PER_THREAD)
   {
     ctx.ended = true;
     atomicSub(active_threads, 1);
     return;
   }
 
-  const Case &meteoroid = problems[idx * CASES_PER_THREAD + ctx.curr_case_num];
+  const Case &meteoroid = problems[idx * CASES_PER_THREAD + ctx.cur_case];
   Record *record = records + iterations * idx;
   real t;
   real *V_arg, *h_arg;
@@ -99,8 +99,8 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_thr
     timestamp = ctx.timestamp;
     iters_count = 0;
   }
-  V_arg = functional_args + (idx * n_timestamps * 2 * CASES_PER_THREAD) + (n_timestamps * 2 * ctx.curr_case_num);
-  h_arg = functional_args + (idx * n_timestamps * 2 * CASES_PER_THREAD) + (n_timestamps * 2 * ctx.curr_case_num) +
+  V_arg = functional_args + (idx * n_timestamps * 2 * CASES_PER_THREAD) + (n_timestamps * 2 * ctx.cur_case);
+  h_arg = functional_args + (idx * n_timestamps * 2 * CASES_PER_THREAD) + (n_timestamps * 2 * ctx.cur_case) +
           n_timestamps;
 
   // The main loop
@@ -128,7 +128,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_thr
     {
       record->t = 0.0; // stop marker
       ctx.t = 0.0;
-      ctx.curr_case_num++;
+      ctx.cur_case++;
       return;
     }
     iters_count++;
@@ -155,6 +155,7 @@ void BatchedAdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_threads
   AdamsKernel<STEPS><<<blocks, threads_per_block>>>(
       contexts, active_threads, problems, dt, timeout, timestamps, n_timestamps, functional_args, records,
       iterations);
+  HANDLE_ERROR(cudaGetLastError());
 }
 
 template

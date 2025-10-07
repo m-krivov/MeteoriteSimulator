@@ -3,45 +3,22 @@
 #include "CudaManager.h"
 #include "GPUParameters.h"
 
-/*void CudaSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
+
+void CudaSolver::Solve(ICaseGenerator &generator, const IFunctional &functional, IResultFormatter &results)
 {
-  size_t steps = 0;
-  switch (alg) {
-  case NumericalAlgorithm::ONE_STEP_ADAMS:
-    steps = 1;
-    break;
-
-  case NumericalAlgorithm::TWO_STEP_ADAMS:
-    steps = 2;
-    break;
-
-  case NumericalAlgorithm::THREE_STEP_ADAMS:
-    steps = 3;
-    break;
-
-  default:
-    throw std::runtime_error("unsupported numerical algorithm");
-  }
-
-  if (dt <= (real)0.0 || timeout < dt * (steps + 1)) {
-    throw std::runtime_error("wrong time step and/or timeout");
-  }
-
-  adams_steps_ = steps;
-  dt_ = dt;
-  timeout_ = timeout;
-}*/
-
-void CudaSolver::Solve(ICaseGenerator& generator, const IFunctional& functional, IResultFormatter& results)
-{
-  std::vector<Case> problems;
   Case problem;
-  //while (generator.Next(problem)) {
-  for (unsigned int i = 0; i < CASE_NUM; i++) {
-    generator.Next(problem);
-    problems.emplace_back(std::move(problem));
+  std::vector<Case> problems;
+  problems.reserve(PORTION_SIZE);
+  do
+  {
+    problems.clear();
+    while (problems.size() < PORTION_SIZE && generator.Next(problem))
+    { problems.emplace_back(std::move(problem)); }
+
+    if (!problems.empty())
+    { Solve(problems, functional, results); }
   }
-  Solve(problems, functional, results);
+  while (!problems.empty());
 }
 
 void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &functional, IResultFormatter &results)
@@ -49,15 +26,15 @@ void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &fun
   switch (Algorithm())
   {
     case NumericalAlgorithm::ONE_STEP_ADAMS:
-      CudaManager<1u, ITERS_PER_KERNEL>(problems, functional, Dt(), Timeout(), results);
+      CudaManager<1u>(problems, functional, Dt(), Timeout(), results);
       break;
 
     case NumericalAlgorithm::TWO_STEP_ADAMS:
-      CudaManager<2u, ITERS_PER_KERNEL>(problems, functional, Dt(), Timeout(), results);
+      CudaManager<2u>(problems, functional, Dt(), Timeout(), results);
       break;
 
     case NumericalAlgorithm::THREE_STEP_ADAMS:
-      CudaManager<3u, ITERS_PER_KERNEL>(problems, functional, Dt(), Timeout(), results);
+      CudaManager<3u>(problems, functional, Dt(), Timeout(), results);
       break;
 
     default:
@@ -65,7 +42,7 @@ void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &fun
   }
 }
 
-void CudaSolver::Solve(const Case &problem, const IFunctional& functional, IResultFormatter& results)
+void CudaSolver::Solve(const Case &problem, const IFunctional &functional, IResultFormatter &results)
 {
   std::vector<Case> problems = {problem};
   Solve(problems, functional, results);

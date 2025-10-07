@@ -4,91 +4,93 @@
 #include "GPUParameters.h"
 
 
-template <unsigned int STEPS, unsigned int ITERS>
-void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& functional, real dt, real timeout,
-                 IResultFormatter& results)
+template <uint32_t STEPS>
+void CudaManager(const std::vector<Case> &problems, const IFunctional &functional,
+                 real dt, real timeout, IResultFormatter &results)
 {
-  unsigned int count_of_threads = problems_vector.size() / CASES_PER_THREAD; // effective threads
-  // preparing buffers
+  size_t n_threads = problems.size() / CASES_PER_THREAD;
 
-  // thread contexts
-  auto dev_thread_sandbox_arr = cuda_make_unique<ThreadContext<STEPS>>(count_of_threads);
+  // Prepare data for GPU
+  CudaPtr<ThreadContext<STEPS>> contexts;
+  HANDLE_ERROR(CudaAlloc(contexts, n_threads));
+  CudaPtr<Case> dev_problems;
+  HANDLE_ERROR(CudaAlloc(dev_problems, problems.size()));
+  HANDLE_ERROR(cudaMemcpy(dev_problems.get(), problems.data(),
+                          sizeof(Case) * problems.size(), cudaMemcpyHostToDevice));
 
-  // problems (read-only)
-  auto dev_problems = cuda_make_unique<Case>(problems_vector.size());
-  HANDLE_ERROR(
-      cudaMemcpy(dev_problems.get(), problems_vector.data(), sizeof(Case) * problems_vector.size(), cudaMemcpyHostToDevice)); // damn reinterpret cast
-
-  // meteorite's timestamps (read-only)
-  const real* timestamps = nullptr;
+  const real *timestamps = nullptr;
   size_t n_timestamps = 0;
   functional.GetTimeStamps(n_timestamps, timestamps);
-  auto dev_timestamps = cuda_make_unique<real>(n_timestamps);
-  HANDLE_ERROR(cudaMemcpy(dev_timestamps.get(), timestamps, sizeof(real) * n_timestamps, cudaMemcpyHostToDevice));
+  CudaPtr<real> dev_timestamps;
+  HANDLE_ERROR(CudaAlloc(dev_timestamps, n_timestamps));
+  HANDLE_ERROR(cudaMemcpy(dev_timestamps.get(), timestamps,
+                          sizeof(real) * n_timestamps, cudaMemcpyHostToDevice));
 
-  // (V_arg[] and h_arg[] for functional)'s for each case
-  size_t functional_args_size = n_timestamps * 2 * count_of_threads * CASES_PER_THREAD;
+  size_t functional_args_size = n_timestamps * 2 * n_threads * CASES_PER_THREAD;
   auto functional_args = std::make_unique<real[]>(functional_args_size);
-  auto dev_functional_args = cuda_make_unique<real>(functional_args_size);
+  CudaPtr<real> dev_functional_args;
+  HANDLE_ERROR(CudaAlloc(dev_functional_args, functional_args_size));
 
-  // vector of Record's arrays
-  // load to CPU vector every iteration
   std::vector<std::unique_ptr<Record[]>> records;
-  auto dev_records = cuda_make_unique<Record>(ITERS_PER_KERNEL * count_of_threads);
+  CudaPtr<Record> dev_records;
+  CudaAlloc(dev_records, ITERS_PER_KERNEL * n_threads);
 
-  // active threads atomic counter (make reduction (or no))
-  unsigned int active_threads = count_of_threads;
-  auto dev_active_threads = cuda_make_unique<unsigned int>(1);
-  HANDLE_ERROR(cudaMemcpy(dev_active_threads.get(), &active_threads, sizeof(unsigned int), cudaMemcpyHostToDevice));
+  uint32_t active_threads = n_threads;
+  CudaPtr<uint32_t> dev_active_threads;
+  HANDLE_ERROR(CudaAlloc(dev_active_threads, 1));
+  HANDLE_ERROR(cudaMemcpy(dev_active_threads.get(), &active_threads,
+                          sizeof(uint32_t), cudaMemcpyHostToDevice));
 
+  // Perform Adams' iterations while at least one thread is active
   int global_iter = 0;
   while (active_threads) {
     global_iter++;
 
-    BatchedAdamsKernel<STEPS>(dev_thread_sandbox_arr.get(), dev_active_threads.get(), dev_problems.get(), problems_vector.size(), dt, timeout,
-                              dev_timestamps.get(), n_timestamps, dev_functional_args.get(), dev_records.get(), ITERS);
+    BatchedAdamsKernel<STEPS>(contexts.get(), dev_active_threads.get(),
+                              dev_problems.get(), problems.size(), dt, timeout,
+                              dev_timestamps.get(), n_timestamps,
+                              dev_functional_args.get(), dev_records.get(), ITERS_PER_KERNEL);
 
-    cudaDeviceSynchronize();
+    HANDLE_ERROR(cudaGetLastError());
 
-    records.push_back(std::make_unique<Record[]>(ITERS_PER_KERNEL * count_of_threads));
-    HANDLE_ERROR(cudaMemcpy(records[records.size() - 1].get(), dev_records.get(), sizeof(Record) * ITERS_PER_KERNEL * count_of_threads, cudaMemcpyDeviceToHost));
+    records.push_back(std::make_unique<Record[]>(ITERS_PER_KERNEL * n_threads));
+    HANDLE_ERROR(cudaMemcpy(records[records.size() - 1].get(), dev_records.get(),
+                 sizeof(Record) * ITERS_PER_KERNEL * n_threads, cudaMemcpyDeviceToHost));
 
-    HANDLE_ERROR(cudaMemcpy(&active_threads, dev_active_threads.get(), sizeof(active_threads), cudaMemcpyDeviceToHost));
+    HANDLE_ERROR(cudaMemcpy(&active_threads, dev_active_threads.get(),
+                            sizeof(active_threads), cudaMemcpyDeviceToHost));
   }
 
-  // process records
-  printf("process records...\n");
-
-  HANDLE_ERROR(cudaMemcpy(functional_args.get(), dev_functional_args.get(), sizeof(real) * functional_args_size, cudaMemcpyDeviceToHost));
+  // Register the simulation results
+  HANDLE_ERROR(cudaMemcpy(functional_args.get(), dev_functional_args.get(),
+                          sizeof(real) * functional_args_size, cudaMemcpyDeviceToHost));
 
   size_t problem_idx = 0;
-  for (size_t thread_idx = 0; thread_idx < count_of_threads; ++thread_idx) {
-    size_t records_idx = 0, rec_i = 0; // global and local idxs
+  for (size_t thread_idx = 0; thread_idx < n_threads; ++thread_idx) {
+    size_t records_idx = 0, rec_i = 0; // global and local indices
     for (size_t case_idx = 0; case_idx < CASES_PER_THREAD; ++case_idx) {
 
-      // prepare new case before writing
-      auto t_next = results.Started(problems_vector[problem_idx]);
+      // Prepare new case before writing
+      auto t_next = results.Started(problems[problem_idx]);
       Record* rec_block = records[records_idx].get() + thread_idx * ITERS_PER_KERNEL;
-      for (unsigned int i = 0; i < STEPS + 1; i++) {
+      for (uint32_t i = 0; i < STEPS + 1; i++) {
         t_next = results.Store(rec_block[rec_i].t, rec_block[rec_i].M, rec_block[rec_i].V, rec_block[rec_i].h,
                                rec_block[rec_i].l, rec_block[rec_i].Gamma);
         rec_i++;
       }
 
-      // write case's necessary records to formatter and functional
+      // Write case's necessary records to formatter and functional
       while (true) {
 
-        // go to next records block if current ended
+        // Go to next records block if the current one is ended
         if (rec_i == ITERS_PER_KERNEL) {
           rec_i = 0;
           records_idx++;
-          if (records_idx == records.size()) {
-            throw std::runtime_error("logically impossible error: uncompleted case");
-          }
+          assert(records_idx != records.size());
           rec_block = records[records_idx].get() + thread_idx * ITERS_PER_KERNEL;
         }
 
-        // end of case's records
+        // End of case's records
         if (rec_block[rec_i].t == (real)0.0) {
           real* V_args =
               functional_args.get() + (thread_idx * n_timestamps * 2 * CASES_PER_THREAD) + (n_timestamps * 2 * case_idx);
@@ -109,7 +111,7 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
           break;
         }
 
-        // store necessary record
+        // Store necessary record
         if (rec_block[rec_i].t >= t_next) {
           t_next = results.Store(rec_block[rec_i].t, rec_block[rec_i].M, rec_block[rec_i].V, rec_block[rec_i].h,
                                  rec_block[rec_i].l, rec_block[rec_i].Gamma);
@@ -123,9 +125,9 @@ void CudaManager(const std::vector<Case>& problems_vector, const IFunctional& fu
 }
 
 // template-specified functions compiles only this way
-template void CudaManager<1u, ITERS_PER_KERNEL>(const std::vector<Case>& problems_vector, const IFunctional& functional,
-                                                real dt, real timeout, IResultFormatter& results);
-template void CudaManager<2u, ITERS_PER_KERNEL>(const std::vector<Case>& problems_vector, const IFunctional& functional,
-                                                real dt, real timeout, IResultFormatter& results);
-template void CudaManager<3u, ITERS_PER_KERNEL>(const std::vector<Case>& problems_vector, const IFunctional& functional,
-                                                real dt, real timeout, IResultFormatter& results);
+template void CudaManager<1u>(const std::vector<Case>& problems, const IFunctional& functional,
+                              real dt, real timeout, IResultFormatter& results);
+template void CudaManager<2u>(const std::vector<Case>& problems, const IFunctional& functional,
+                              real dt, real timeout, IResultFormatter& results);
+template void CudaManager<3u>(const std::vector<Case>& problems, const IFunctional& functional,
+                              real dt, real timeout, IResultFormatter& results);

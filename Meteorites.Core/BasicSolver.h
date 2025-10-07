@@ -24,12 +24,15 @@ class BasicSolver : public ISolver
 
     NumericalAlgorithm Algorithm() const { return algorithm_; }
 
+    size_t Steps() const { return steps_; }
+
     real Dt() const { return dt_; }
 
     real Timeout() const { return timeout_; }
 
   private:
     NumericalAlgorithm algorithm_ = NumericalAlgorithm::ONE_STEP_ADAMS;
+    size_t steps_ = 1;
     real dt_ = (real)0.001;
     real timeout_ = (real)1000.0;
 };
