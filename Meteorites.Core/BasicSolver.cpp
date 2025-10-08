@@ -1,5 +1,6 @@
 #include "BasicSolver.h"
 
+
 void BasicSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
 {
   size_t steps{};

@@ -32,7 +32,6 @@ struct ThreadContext
   size_t nxt{};
   real t{};
   size_t timestamp{};
-  size_t cur_case{};
   bool ended{};
 
   ThreadContext() = default;

@@ -119,6 +119,6 @@ void GoldSolver::Solve(const Case &problem, const IFunctional &functional, IResu
       break;
 
     default:
-      throw std::runtime_error("unknown numverical algorithm");
+      throw std::runtime_error("unknown numerical algorithm");
   }
 }

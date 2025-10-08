@@ -26,15 +26,15 @@ void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &fun
   switch (Algorithm())
   {
     case NumericalAlgorithm::ONE_STEP_ADAMS:
-      CudaManager<1u>(problems, functional, Dt(), Timeout(), results);
+      CudaManager<1u>(problems, Dt(), Timeout(), 256, functional, results);
       break;
 
     case NumericalAlgorithm::TWO_STEP_ADAMS:
-      CudaManager<2u>(problems, functional, Dt(), Timeout(), results);
+      CudaManager<2u>(problems, Dt(), Timeout(), 256, functional, results);
       break;
 
     case NumericalAlgorithm::THREE_STEP_ADAMS:
-      CudaManager<3u>(problems, functional, Dt(), Timeout(), results);
+      CudaManager<3u>(problems, Dt(), Timeout(), 256, functional, results);
       break;
 
     default:

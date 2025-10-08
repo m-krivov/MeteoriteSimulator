@@ -1,5 +1,25 @@
 #include "ResultFormatters.h"
 
+//------------------------
+//--- IResultFormatter ---
+//------------------------
+
+IResultFormatter::Reason IResultFormatter::Classify(real t, real M, real h)
+{
+  if (M <= (real)0.01)
+  {
+    return IResultFormatter::Reason::Burnt;
+  }
+  else if (h <= (real)0.0)
+  {
+    return IResultFormatter::Reason::Collided;
+  }
+  else
+  {
+    return IResultFormatter::Reason::Timeouted;
+  }
+}
+
 //--------------------
 //--- CsvFromatter ---
 //--------------------

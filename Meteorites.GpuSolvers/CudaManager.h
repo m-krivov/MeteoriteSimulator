@@ -6,5 +6,5 @@
 #include "Meteorites.Core/ResultFormatters.h"
 
 template <uint32_t STEPS>
-void CudaManager(const std::vector<Case> &problems, const IFunctional &functional,
-                 real dt, real timeout, IResultFormatter &results);
+void CudaManager(const std::vector<Case> &problems, real dt, real timeout, size_t block_size,
+                 const IFunctional &functional, IResultFormatter &results);
