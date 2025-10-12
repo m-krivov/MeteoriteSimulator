@@ -1,5 +1,5 @@
 #pragma once
-#include "Meteorites.Core/Defs.h"
+#include "Meteorites.GpuSolvers/CudaDefs.h"
 #include "Meteorites.Core/BasicSolver.h"
 
 
@@ -7,7 +7,23 @@
 class CudaSolver : public BasicSolver
 {
   public:
-    CudaSolver() = default;
+    struct Config
+    {
+      // How many CUDA threads must be spawned per each block
+      // Will be used to configure the grid for a CUDA kernel
+      size_t threads_per_block = 32;
+
+      // Each block performs no more than the requested number of Adams' iterations
+      // After that, it sends the intermediate simulation results to host
+      size_t iterations_per_block = 200;
+
+      // How many blocks must be spawned per each CUDA streaming multiprocessor
+      // Large numbers can lead to high memory usage
+      size_t blocks_per_sm = 4;
+    };
+
+    CudaSolver(Config config = Config());
+    virtual ~CudaSolver();
 
     // ISolver method
     virtual void Solve(const Case &problem,
@@ -24,6 +40,17 @@ class CudaSolver : public BasicSolver
                        const IFunctional &functional,
                        IResultFormatter &results) override final;
   private:
-    // How many meteorites should be extracted from the generator at one time
-    constexpr static size_t PORTION_SIZE = 4 * 1024;
+    // How many meteorites must be simulated at one time
+    size_t BatchSize() const;
+
+    cudaDeviceProp props_{};
+    const Config config_{};
+
+    CudaPtr<uint8_t> buffer_counter_;
+    CudaPtr<uint8_t> buffer_problems_;
+    CudaPtr<uint8_t> buffer_contexts_;
+    CudaPtr<uint8_t> buffer_records_;
+    CudaPtr<uint8_t> buffer_timestamps_;
+    CudaPtr<uint8_t> buffer_functional_;
+    size_t n_timestamps_{0};    // implicitly defines the size of 'buffer_functional_' and 'buffer_timestamps_'
 };

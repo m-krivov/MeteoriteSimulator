@@ -45,4 +45,4 @@ void BatchedAdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_threads
                         const Case *problems, size_t n_problems, real dt, real timeout,
                         const real *timestamps, size_t n_timestamps,
                         real *functional_args, Record *records,
-                        size_t iterations);
+                        size_t iterations, size_t threads_per_block);

@@ -9,9 +9,9 @@
 // The known numerical methods that may be used to solve ODEs
 enum class NumericalAlgorithm : uint32_t
 {
-  ONE_STEP_ADAMS     = 0,
-  TWO_STEP_ADAMS     = 1,
-  THREE_STEP_ADAMS   = 2
+  ONE_STEP_ADAMS,
+  TWO_STEP_ADAMS,
+  THREE_STEP_ADAMS
 };
 
 

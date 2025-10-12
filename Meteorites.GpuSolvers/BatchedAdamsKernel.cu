@@ -1,8 +1,11 @@
-#include "AdamsKernels.h"
+#include "BatchedAdamsKernel.h"
 
 #include "Meteorites.Core/Constants.h"
 
 #include "GPUParameters.h"
+
+namespace
+{
 
 template <unsigned int STEPS>
 __device__ void InitContext(ThreadContext<STEPS> &ctx, const Case &meteoroid, real dt, size_t idx,
@@ -136,20 +139,26 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_thr
   ctx.timestamp = timestamp;
 };
 
+} // unnamed namespace
+
+
 template <unsigned int STEPS>
 void BatchedAdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_threads,
                         const Case *problems, size_t n_problems,
                         real dt, real timeout, const real *timestamps, size_t n_timestamps,
                         real *functional_args, Record *records,
-                        size_t iterations)
+                        size_t iterations, size_t threads_per_block)
 {
   assert(n_problems > 0);
-  dim3 threads_per_block{ THREADS_PER_BLOCK };
-  dim3 blocks(((n_problems - 1) / threads_per_block.x) + 1);
-  AdamsKernel<STEPS><<<blocks, threads_per_block>>>(contexts, active_threads,
-                                                    problems, n_problems, dt, timeout,
-                                                    timestamps, n_timestamps,
-                                                    functional_args, records, iterations);
+  assert(iterations > 0);
+  assert(threads_per_block > 0);
+
+  dim3 threads{ (uint32_t)threads_per_block };
+  dim3 blocks(((n_problems - 1) / threads.x) + 1);
+  AdamsKernel<STEPS><<<blocks, threads>>>(contexts, active_threads,
+                                          problems, n_problems, dt, timeout,
+                                          timestamps, n_timestamps,
+                                          functional_args, records, iterations);
   HANDLE_ERROR(cudaGetLastError());
 }
 
@@ -158,16 +167,16 @@ void BatchedAdamsKernel<1u>(ThreadContext<1u> *contexts, uint32_t *active_thread
                             const Case *problems, size_t n_problems, real dt, real timeout,
                             const real *timestamps, size_t n_timestamps,
                             real *functional_args, Record *records,
-                            size_t iterations);
+                            size_t iterations, size_t threads_per_block);
 template
 void BatchedAdamsKernel<2u>(ThreadContext<2u> *contexts, uint32_t *active_threads,
                             const Case *problems, size_t n_problems, real dt, real timeout,
                             const real *timestamps, size_t n_timestamps,
                             real *functional_args, Record *records,
-                            size_t iterations);
+                            size_t iterations, size_t threads_per_block);
 template
 void BatchedAdamsKernel<3u>(ThreadContext<3u> *contexts, uint32_t *active_threads,
                             const Case *problems, size_t n_problems, real dt, real timeout,
                             const real *timestamps, size_t n_timestamps,
                             real *functional_args, Record *records,
-                            size_t iterations);
+                            size_t iterations, size_t threads_per_block);
