@@ -1,8 +1,6 @@
 #pragma once
 
-#include "CudaStructures.h"
-
-#include <curand_kernel.h>
+#include "Meteorites.Core/Defs.h"
 
 constexpr int BEST_CASES_BUFFER_SIZE = 4;
 

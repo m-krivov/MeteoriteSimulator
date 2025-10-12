@@ -1,7 +1,8 @@
-#include "CudaAdamsMethod.h"
+#include "AdamsMethod.h"
 
 #include "Meteorites.Core/ResultFormatters.h"
-#include "Meteorites.Core/Case.h"
+
+#include "CudaStructures.h"
 
 template <uint32_t STEPS>
 __device__ void
@@ -120,6 +121,7 @@ __device__ inline real
 GPUL2Compute(real *v, real *h, const real *ref_v, const real *ref_h, int size)
 {
   real v_sum = 0.0, h_sum = 0.0;
+
   for (int i = 0; i < size; i++)
   {
     real dv = (ref_v[i] - v[i]) / ref_v[0];
@@ -132,17 +134,17 @@ GPUL2Compute(real *v, real *h, const real *ref_v, const real *ref_h, int size)
 }
 
 __device__ inline void
-InsertToTopSmallest(real *devs, curandState *states, int size,
+InsertToTopSmallest(real *devs, curandState *states,
                     real dev, curandState state,
                     real border_dev = std::numeric_limits<real>::max())
 {
-    if (dev > border_dev || dev > devs[size-1]) return;
+    if (dev > devs[BEST_CASES_BUFFER_SIZE-1] || dev > border_dev) return;
     int pos = 0;
-    while (pos < size && dev > devs[pos]) pos++;
+    while (pos < BEST_CASES_BUFFER_SIZE && dev > devs[pos]) pos++;
 
-    if (pos < size)
+    if (pos < BEST_CASES_BUFFER_SIZE)
     {
-        for (int i = size-1; i > pos; i--)
+        for (int i = BEST_CASES_BUFFER_SIZE-1; i > pos; i--)
         {
             devs[i] = devs[i-1];
             states[i] = states[i-1];
@@ -165,7 +167,6 @@ GenerateCase(CudaCase &curr_case, curandState &curr_state, const real v0, const 
   curr_case.h0_ = h0;// + (curand_uniform(&curr_state) - 0.5) * h0 * 0.001;
   curr_case.gamma0_ = curand_uniform(&curr_state) * (M_PI / 2);
 }
-
 
 //  WARP DIVERGENCE SCHEME:
 
@@ -214,7 +215,6 @@ AdamsMethodKernel(const uint64_t *seeds,
   for (uint32_t i = 0; i < CASES_PER_THREAD; i++)
   {
     GenerateCase(curr_case, curr_state, v0, h0);
-    /*test*///if (!i) printf("\ncase:\tm0:%f\tv0:%f\tgamma0:%f\n", curr_case.m0_, curr_case.v0_, curr_case.gamma0_);
 
     t = dt * STEPS;
     timestamp = 0;
@@ -223,21 +223,35 @@ AdamsMethodKernel(const uint64_t *seeds,
 
     while (true)
     {
+#ifdef DISPLAY_WARP_DIVERGENCE
+      unsigned int mask = __activemask();
+      if(threadIdx.x == 0)
+      {
+        printf("ADAMS_STEP: ");
+        for (int i = 31; i >= 0; i--) {
+            printf("%d", (mask >> i) & 1);
+            if (i % 8 == 0 && i != 0) printf(" ");
+        }
+        printf("\n");
+      }
+#endif
       if (AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, steps, v_args, h_args,
                            timestamp, nxt, curr_case, t) != IResultFormatter::Reason::NA) break;
     }
-    /*test*///if (!tid && i == 100) {
-      //printf("\nTEST CASE COMPUTE\n");
-      //for (int i = 0; i < n_timestamps; i++) {
-      //  printf("v:%f h:%f\t<->\tref_v:%f ref_h:%f\n", v_args[i], h_args[i], ref_v[i], ref_h[i]);
-      //}
-    //}
+#ifdef DISPLAY_WARP_DIVERGENCE
+    unsigned int mask = __activemask();
+    if(threadIdx.x == 0)
+    {
+      printf("UPDATE: ");
+      for (int i = 31; i >= 0; i--) {
+          printf("%d", (mask >> i) & 1);
+          if (i % 8 == 0 && i != 0) printf(" ");
+      }
+      printf("\n");
+    }
+#endif
     curr_dev = GPUL2Compute(&v_args[0], &h_args[0], ref_v, ref_h, n_timestamps);
-    //if (curr_dev < 1e-2) printf("PENIS");
-    /*test*///if (!tid && i == 100) {printf("->\tdev:%f\n", curr_dev); printf("TEST CASE COMPUTE\n\n");}
-    /*test*///if (!tid) printf(" -> Vn:%f Hn:%f -> deviation:%f\n", v_args[0], h_args[0], curr_dev);
-    InsertToTopSmallest(local_best_cases_devs, local_best_cases_states,
-                        BEST_CASES_BUFFER_SIZE, curr_dev, base_state, border_dev);
+    InsertToTopSmallest(local_best_cases_devs, local_best_cases_states, curr_dev, base_state, border_dev);
     base_state = curr_state;
   }
 
@@ -247,8 +261,6 @@ AdamsMethodKernel(const uint64_t *seeds,
     best_cases_states[tid * BEST_CASES_BUFFER_SIZE + i] = local_best_cases_states[i];
   }
 }
-
-
 
 //  WARP DIVERGENCE SCHEME:
 
@@ -262,100 +274,104 @@ AdamsMethodKernel(const uint64_t *seeds,
 //  UPDATE_CASE    |   |
 //                 |   |
 
-// template <uint32_t STEPS>
-// __global__ void
-// AdamsMethodKernel(CudaCase* cases, uint32_t* blocks_counter,
-//                   real *timestamps, const size_t n_timestamps,
-//                   real *ref_v, real *ref_h, real dt, real timeout,
-//                   real *best_cases_devs, uint32_t *best_cases_idxs, real max_dev,
-//                   real *v_arg, real *h_arg,
-//                   const uint32_t CASES_PER_BLOCK)
-// {
-//   __shared__ uint32_t cases_counter;
-//   __shared__ uint32_t curr_block_idx;
+template <uint32_t STEPS>
+__global__ void
+AdamsMethodBalancedKernel(const uint64_t *seeds,
+                          const real *timestamps, size_t n_timestamps,
+                          const real *ref_v, const real *ref_h,
+                          real dt, real timeout,
+                          real *best_cases_devs, curandState *best_cases_states, real border_dev,
+                          real *v_args_arr, real *h_args_arr,
+                          uint32_t CASES_PER_THREAD)
+{
+  __shared__ uint32_t cases_counter;
+  if (threadIdx.x == 0) cases_counter = blockDim.x;
+  uint32_t case_number = blockDim.x;
 
-//   CudaCase* cases_block = cases + blockIdx.x * CASES_PER_BLOCK;
-//   uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-//   CudaCase current_case = cases_block[threadIdx.x];
-//   uint32_t curr_case_idx = threadIdx.x;
+  const uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-//   uint32_t local_best_cases_idxs[BEST_CASES_BUFFER_SIZE];
-//   real local_best_cases_devs[BEST_CASES_BUFFER_SIZE];
-//   for (int i = 0; i < BEST_CASES_BUFFER_SIZE; i++)
-//   {
-//     local_best_cases_devs[i] = std::numeric_limits<double>::max();
-//   }
-//   real curr_dev;
+  curandState base_state;
+  curand_init(seeds[tid], 0, 0, &base_state);
+  curandState curr_state = base_state;
+  CudaCase    curr_case;
+  const real  v0 = ref_v[0], h0 = ref_h[0];
 
-//   Layer steps[STEPS + 1];
-//   real *V_arg = v_arg + (blockIdx.x * blockDim.x + threadIdx.x) * n_timestamps,
-//        *H_arg = h_arg + (blockIdx.x * blockDim.x + threadIdx.x) * n_timestamps;
-//   real t;
-//   size_t timestamp;
-//   size_t nxt;
+  curandState local_best_cases_states[BEST_CASES_BUFFER_SIZE];
+  real        local_best_cases_devs[BEST_CASES_BUFFER_SIZE];
+  for (int i = 0; i < BEST_CASES_BUFFER_SIZE; i++)
+  {
+    local_best_cases_devs[i] = std::numeric_limits<double>::max();
+  }
+  real curr_dev;
 
+  Layer  steps[STEPS + 1];
+  real  *v_args = v_args_arr + tid * n_timestamps,
+        *h_args = h_args_arr + tid * n_timestamps;
+  real   t;
+  size_t timestamp;
+  size_t nxt;
 
-//   /*test*///if (!tid) {
-//   /*test*///  printf("\ncase_id:%i/%i\n\tm0:%f", 0, 0, current_case.m0_);
-//   /*test*///}
-//   t = dt * STEPS;
-//   timestamp = 0;
-//   nxt = STEPS;
-//   InitSteps<STEPS>(steps, current_case, dt);
+  GenerateCase(curr_case, curr_state, v0, h0);
 
+  t = dt * STEPS;
+  timestamp = 0;
+  nxt = STEPS;
+  InitSteps<STEPS>(steps, curr_case, dt);
 
-//   while (true) // block cicle
-//   {
-//     if (threadIdx.x == 0) {
-//       cases_counter = blockDim.x;
-//       curr_block_idx = blockIdx.x;
-//     }
-//     while (true) // in-block cicle
-//     {   
-//           if (AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, steps, V_arg, H_arg,
-//                                timestamp, nxt, current_case, t) != IResultFormatter::Reason::NA)
-//           { // end of case
-//             curr_dev = GPUL2Compute(n_timestamps, &V_arg[0], &H_arg[0], ref_v, ref_h);
-//             /*test*///if (!tid) printf(" -> Vn:%f Hn:%f | rVn:%f rHn:%f ->  deviation:%f\n",
-//             /*test*///  V_arg[0], H_arg[0], ref_v[0], ref_h[0], curr_dev);
+  while (true)
+  {
+#ifdef DISPLAY_WARP_DIVERGENCE
+    unsigned int mask = __activemask();
+    if(threadIdx.x == 0)
+    {
+      printf("ADAMS_STEP: ");
+      for (int i = 31; i >= 0; i--) {
+          printf("%d", (mask >> i) & 1);
+          if (i % 8 == 0 && i != 0) printf(" ");
+      }
+      printf("\n");
+    }
+#endif
+    if (AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, steps, v_args, h_args,
+                         timestamp, nxt, curr_case, t) == IResultFormatter::Reason::NA)
+    {
+      continue;
+    }
+    else
+    {
+#ifdef DISPLAY_WARP_DIVERGENCE
+      unsigned int mask = __activemask();
+      if(threadIdx.x == 0)
+      {
+        printf("UPDATE: ");
+        for (int i = 31; i >= 0; i--) {
+            printf("%d", (mask >> i) & 1);
+            if (i % 8 == 0 && i != 0) printf(" ");
+        }
+        printf("\n");
+      }
+#endif
+      curr_dev = GPUL2Compute(&v_args[0], &h_args[0], ref_v, ref_h, n_timestamps);
+      InsertToTopSmallest(local_best_cases_devs, local_best_cases_states, curr_dev, base_state, border_dev);
+      base_state = curr_state;
 
-//             /*test*/ /*if (curr_dev <= 0.015) {
-//               printf("\nDeviation:%f\n", curr_dev);
-//               for (int i = 0; i < n_timestamps; i++) {
-//                 printf("|\tV:%f H:%f\trV:%f rH:%f\n", V_arg[i], H_arg[i], ref_v[i], ref_h[i]);
-//               }
-//             }*/
+      case_number = atomicAdd(&cases_counter, 1);
+      if (case_number >= blockDim.x * CASES_PER_THREAD) break;
 
-//             InsertToTopSmallest(local_best_cases_devs, local_best_cases_idxs,
-//                                    BEST_CASES_BUFFER_SIZE, curr_dev, curr_case_idx, max_dev);
+      GenerateCase(curr_case, curr_state, v0, h0);
 
-//             curr_case_idx = atomicAdd(&cases_counter, 1);
-//             if (curr_case_idx >= CASES_PER_BLOCK) break;
-//             current_case = cases_block[curr_case_idx];
-
-//             /*test*///if (!tid) {
-//             /*test*///  printf("\ncase_id:%i/%i\n\tm0:%f", curr_block_idx, curr_case_idx, current_case.m0_);
-//             /*test*///}
-//             t = dt * STEPS;
-//             timestamp = 0;
-//             nxt = STEPS;
-//             InitSteps<STEPS>(steps, current_case, dt);
-//           }
-//     }
-    
-//     __syncthreads();
-//     if (threadIdx.x == 0) curr_block_idx = atomicAdd(blocks_counter, 1);
-//     if (curr_block_idx >= gridDim.x) break;
-//     cases_block = cases + curr_block_idx * CASES_PER_BLOCK;
-//   }
-
-//   for (uint32_t i = 0; i < BEST_CASES_BUFFER_SIZE; i++)
-//   {
-//     best_cases_devs[tid * BEST_CASES_BUFFER_SIZE + i] = local_best_cases_devs[i];
-//     best_cases_idxs[tid * BEST_CASES_BUFFER_SIZE + i] = local_best_cases_idxs[i];
-//   }
-// }
-
+      t = dt * STEPS;
+      timestamp = 0;
+      nxt = STEPS;
+      InitSteps<STEPS>(steps, curr_case, dt);
+    }
+  }
+  for (int i = 0; i < BEST_CASES_BUFFER_SIZE; i++)
+  {
+    best_cases_devs[tid * BEST_CASES_BUFFER_SIZE + i] = local_best_cases_devs[i];
+    best_cases_states[tid * BEST_CASES_BUFFER_SIZE + i] = local_best_cases_states[i];
+  }
+}
 
 template <uint32_t STEPS>
 void CudaAdamsMethodLauncher(const uint64_t *seeds,
@@ -368,7 +384,7 @@ void CudaAdamsMethodLauncher(const uint64_t *seeds,
                              uint32_t BLOCKS_NUM, uint32_t THREADS_PER_BLOCK)
 {
 
-  AdamsMethodKernel<STEPS><<<BLOCKS_NUM, THREADS_PER_BLOCK>>>
+  AdamsMethodBalancedKernel<STEPS><<<BLOCKS_NUM, THREADS_PER_BLOCK>>>
     (seeds,
      timestamps, n_timestamps,
      ref_v, ref_h,

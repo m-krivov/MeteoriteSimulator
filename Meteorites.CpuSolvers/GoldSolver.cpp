@@ -2,6 +2,10 @@
 
 #include "Meteorites.Core/Constants.h"
 
+#include <iostream>
+#include <chrono>
+#include <thread>
+
 namespace
 {
 
@@ -180,17 +184,26 @@ void AdamsMethod(const Case &problem, const IFunctional &functional, real dt, re
                    problem.h0(), problem.l0(), problem.M0());
   t_next = results.Store(t, steps[STEPS].M(), steps[STEPS].V(),
                          steps[STEPS].h(), steps[STEPS].l(), steps[STEPS].Gamma());
+  /*test_output*//*printf("init_1_store: %f %f %f %f %f %f\n", t, steps[STEPS].M(), steps[STEPS].V(),
+                         steps[STEPS].h(), steps[STEPS].l(), steps[STEPS].Gamma());
+  std::cout << "t_next: " << t_next << "\n";*/
 
   OneStepAdams(steps[STEPS - 1], steps[STEPS], dt);
   t += dt;
   t_next = results.Store(t, steps[STEPS - 1].M(), steps[STEPS - 1].V(),
                          steps[STEPS - 1].h(), steps[STEPS - 1].l(), steps[STEPS - 1].Gamma());
+  /*test_output*//*printf("init_2_store: %f %f %f %f %f %f\n", t, steps[STEPS - 1].M(), steps[STEPS - 1].V(),
+                         steps[STEPS - 1].h(), steps[STEPS - 1].l(), steps[STEPS - 1].Gamma());
+  std::cout << "t_next: " << t_next << "\n";*/
   
   if (STEPS >= 2) {
     TwoStepAdams(steps[STEPS - 2], steps[STEPS - 1], steps[STEPS], dt);
     t += dt;
     t_next = results.Store(t, steps[STEPS - 2].M(), steps[STEPS - 2].V(),
                            steps[STEPS - 2].h(), steps[STEPS - 2].l(), steps[STEPS - 2].Gamma());
+    /*test_output*//*printf("init_3_store: %f %f %f %f %f %f\n", t, steps[STEPS - 2].M(), steps[STEPS - 2].V(),
+                           steps[STEPS - 2].h(), steps[STEPS - 2].l(), steps[STEPS - 2].Gamma());
+    std::cout << "t_next: " << t_next << "\n";*/
   }
 
   if (STEPS >= 3) {
@@ -198,6 +211,9 @@ void AdamsMethod(const Case &problem, const IFunctional &functional, real dt, re
     t += dt;
     t_next = results.Store(t, steps[STEPS - 3].M(), steps[STEPS - 3].V(),
                            steps[STEPS - 3].h(), steps[STEPS - 3].l(), steps[STEPS - 3].Gamma());
+    /*test_output*//*printf("init_4_store: %f %f %f %f %f %f\n", t, steps[STEPS - 3].M(), steps[STEPS - 3].V(),
+                           steps[STEPS - 3].h(), steps[STEPS - 3].l(), steps[STEPS - 3].Gamma());
+    std::cout << "t_next: " << t_next << "\n";*/
   }
 
   // Prepare buffers for values that are wanted by functional
@@ -229,8 +245,14 @@ void AdamsMethod(const Case &problem, const IFunctional &functional, real dt, re
     auto h = steps[nxt].h();
 
     t += dt;
+
+    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    //if (t >= 0.03) return;
+
     if (t >= t_next)
-    { t_next = results.Store(t, M, steps[nxt].V(), h, steps[nxt].l(), steps[nxt].Gamma()); }
+    { t_next = results.Store(t, M, steps[nxt].V(), h, steps[nxt].l(), steps[nxt].Gamma());
+      /*test_output*//*printf("store: %f %f %f %f %f %f\n", t, M, steps[nxt].V(), h,
+                             steps[nxt].l(), steps[nxt].Gamma());*/}
     nxt = (nxt + STEPS) % (STEPS + 1);
    
     // Check, should we stop the simulation?
@@ -282,8 +304,19 @@ void GoldSolver::Solve(ICaseGenerator &generator,
                        IResultFormatter &results)
 {
   Case problem;
+  //generator.Next(problem);
   while (generator.Next(problem))
   {
+    /*test_output*//*std::cout << "gold case:" << problem.Cd() << " "
+                  << problem.Ch() << " "
+                  << problem.Cl() << " "
+                  << problem.Gamma0() << " "
+                  << problem.h0() << " "
+                  << problem.H() << " "
+                  << problem.l0() << " "
+                  << problem.M0() << " "
+                  << problem.Rho() << " "
+                  << problem.V0() << std::endl;*/
     Solve(problem, functional, results);
   }
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Defs.h"
+#include <cuda_runtime.h>
 
 // Containes the complete information about a single virtual case
 // Where:
@@ -20,7 +21,12 @@ class Case
         m0_((real)0.0f), v0_((real)0.0f),
         h0_((real)0.0f), gamma0_((real)0.0f) { }
 
-    Case(real H, real ch, real rho, real cd, real cl,
+    //Case(real H, real ch, real rho, real cd, real cl,
+    //     real m0, real v0, real h0, real gamma0)
+    //  : H_(H), ch_(ch), rho_(rho), cd_(cd), cl_(cl),
+    //    m0_(m0), v0_(v0), h0_(h0), gamma0_(gamma0) { }
+
+    __device__ Case(real H, real ch, real rho, real cd, real cl,
          real m0, real v0, real h0, real gamma0)
       : H_(H), ch_(ch), rho_(rho), cd_(cd), cl_(cl),
         m0_(m0), v0_(v0), h0_(h0), gamma0_(gamma0) { }

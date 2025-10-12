@@ -1,14 +1,14 @@
-#include "CudaManager.h"
+#include "CudaManagers.h"
+
+#include "Meteorites.Core/IMeteorite.h"
+#include "Meteorites.Core/Case.h"
 
 #include "CudaHandleError.h"
 #include "CudaUniquePtr.h"
-#include "Random.h"
-#include "CudaAdamsMethod.h"
+#include "AdamsMethod.h"
 #include "CudaStructures.h"
-#include "GenerateCases.h"
-
-#include <memory>
-#include <cuda_runtime.h>
+#include "RestoreCases.h"
+#include "Random.h"
 
 void GenerateSeeds(uint64_t* seeds, int N)
 {
@@ -30,14 +30,12 @@ void GenerateSeeds(uint64_t* seeds, int N)
   }
 }
 
-
-
 template <uint32_t STEPS>
-void CudaManager(const IMeteorite &meteorite, uint64_t *seeds, int N,
-                 real dt, real timeout, real border_dev,
-                 uint32_t BLOCKS_NUM, uint32_t THREADS_PER_BLOCK,
-                 uint32_t BEST_CASES_BUFFER_SIZE, uint32_t CASES_PER_THREAD,
-                 curandState *result_curand_states, real *result_deviations)
+void CudaAdamsMethodManager(const IMeteorite &meteorite, uint64_t *seeds, int N,
+                            real dt, real timeout, real border_dev,
+                            uint32_t BLOCKS_NUM, uint32_t THREADS_PER_BLOCK,
+                            uint32_t BEST_CASES_BUFFER_SIZE, uint32_t CASES_PER_THREAD,
+                            curandState *result_curand_states, real *result_deviations)
 {
   size_t n_timestamps = 0;
   const real *timestamps, *v, *h;
@@ -79,7 +77,7 @@ void CudaManager(const IMeteorite &meteorite, uint64_t *seeds, int N,
   cudaEventRecord(stop,0);
   cudaEventSynchronize(stop);
   cudaEventElapsedTime(&elapsedTime, start, stop);
-  /*test*/printf("Time spent executing by the GPU: %.2f millseconds\n", elapsedTime);
+  /*test*/printf("Time spent executing by the GPU: %.2f milliseconds\n", elapsedTime);
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
 
@@ -91,23 +89,23 @@ void CudaManager(const IMeteorite &meteorite, uint64_t *seeds, int N,
                          sizeof(real) * GLOBAL_BEST_BUFFER_SIZE, cudaMemcpyDeviceToHost));
 }
 
-template void CudaManager<1u>(const IMeteorite &meteorite, uint64_t *seeds, int N,
-                              real dt, real timeout, real border_dev,
-                              uint32_t BLOCKS_NUM, uint32_t THREADS_PER_BLOCK,
-                              uint32_t BEST_CASES_BUFFER_SIZE, uint32_t CASES_PER_THREAD,
-                              curandState *result_curand_states, real *result_deviations);
-template void CudaManager<2u>(const IMeteorite &meteorite, uint64_t *seeds, int N,
-                              real dt, real timeout, real border_dev,
-                              uint32_t BLOCKS_NUM, uint32_t THREADS_PER_BLOCK,
-                              uint32_t BEST_CASES_BUFFER_SIZE, uint32_t CASES_PER_THREAD,
-                              curandState *result_curand_states, real *result_deviations);
-template void CudaManager<3u>(const IMeteorite &meteorite, uint64_t *seeds, int N,
-                              real dt, real timeout, real border_dev,
-                              uint32_t BLOCKS_NUM, uint32_t THREADS_PER_BLOCK,
-                              uint32_t BEST_CASES_BUFFER_SIZE, uint32_t CASES_PER_THREAD,
-                              curandState *result_curand_states, real *result_deviations);
+template void CudaAdamsMethodManager<1u>(const IMeteorite &meteorite, uint64_t *seeds, int N,
+                                         real dt, real timeout, real border_dev,
+                                         uint32_t BLOCKS_NUM, uint32_t THREADS_PER_BLOCK,
+                                         uint32_t BEST_CASES_BUFFER_SIZE, uint32_t CASES_PER_THREAD,
+                                         curandState *result_curand_states, real *result_deviations);
+template void CudaAdamsMethodManager<2u>(const IMeteorite &meteorite, uint64_t *seeds, int N,
+                                         real dt, real timeout, real border_dev,
+                                         uint32_t BLOCKS_NUM, uint32_t THREADS_PER_BLOCK,
+                                         uint32_t BEST_CASES_BUFFER_SIZE, uint32_t CASES_PER_THREAD,
+                                         curandState *result_curand_states, real *result_deviations);
+template void CudaAdamsMethodManager<3u>(const IMeteorite &meteorite, uint64_t *seeds, int N,
+                                         real dt, real timeout, real border_dev,
+                                         uint32_t BLOCKS_NUM, uint32_t THREADS_PER_BLOCK,
+                                         uint32_t BEST_CASES_BUFFER_SIZE, uint32_t CASES_PER_THREAD,
+                                         curandState *result_curand_states, real *result_deviations);
 
-std::vector<Case> CudaGeneratorManager(const curandState *states, int N, real v0, real h0)
+std::vector<Case> CudaRestoreCasesManager(const curandState *states, int N, real v0, real h0)
 {
   auto dev_cases = cuda_make_unique<Case>(N);
   auto dev_states = cuda_make_unique<curandState>(N);

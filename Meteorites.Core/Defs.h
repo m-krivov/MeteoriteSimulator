@@ -15,7 +15,10 @@
 #include <vector>
 #include <unordered_map>
 
-typedef double real;
+#include <cuda_runtime.h>
+#include <curand_kernel.h>
+
+typedef float real;
 
 #if !defined(M_PI)
 constexpr double M_PI = 3.1415926535897932384626433832795;

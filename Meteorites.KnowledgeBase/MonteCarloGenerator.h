@@ -16,6 +16,8 @@ class MonteCarloGenerator : public ICaseGenerator
 
     virtual bool Next(Case &problem) override;
 
+    //virtual size_t N_cases() {return n_cases_;}
+
   private:
     mutable std::mt19937 gen_;
     std::uniform_real_distribution<real> dist_;

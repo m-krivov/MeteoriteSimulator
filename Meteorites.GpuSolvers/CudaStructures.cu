@@ -2,8 +2,6 @@
 
 #include "Meteorites.Core/Defs.h"
 
-#include <cuda_runtime.h>
-
 /*test*/ #include<iostream>
 
 __device__ inline double cudaExp(double x) { return exp(x); }
