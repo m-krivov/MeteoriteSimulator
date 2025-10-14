@@ -101,7 +101,7 @@ AdamsStep(const real *timestamps, size_t n_timestamps, real &dt, real &timeout,
   t += dt;
 
   nxt = (nxt + STEPS) % (STEPS + 1);
-   
+
   if (M <= (real)0.01)
   {
     return IResultFormatter::Reason::Burnt;
@@ -265,7 +265,7 @@ AdamsMethodKernel(const uint64_t *seeds,
 //  WARP DIVERGENCE SCHEME:
 
 //  ADAMS_STEP   ||||||||
-//               ||||||||              
+//               ||||||||
 //  UPDATE_CASE       |
 //                    |
 //  ADAMS_STEP   ||||||||

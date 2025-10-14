@@ -37,11 +37,11 @@ int main()
   const IMeteorite *meteorite  = KnownMeteorites::Get(METEORITE);
 
   real STAGE1_TIMEOUT = (real)0.0;
-  
+
   size_t records;
   const real *time, *v, *h;
   meteorite->Trajectory(records, time, v, h);
-  STAGE1_TIMEOUT = time[records - 1] + STAGE1_DT + 30 * 2;
+  STAGE1_TIMEOUT = time[records - 1] + STAGE1_DT + 30 * 0;
 
   //GPU
 
@@ -53,10 +53,9 @@ int main()
   std::cout << "\tTimeout: " << STAGE1_TIMEOUT << " seconds" << std::endl;
   std::cout << "\tdt:      " << STAGE1_DT << " seconds" << std::endl;
 
-  printf("\nGPU config:\n\tBlocks:%u\n\tThreads per block:%u\n\tCases per thread:%u\n", 
+  printf("\nGPU config:\n\tBlocks:%u\n\tThreads per block:%u\n\tCases per thread:%u\n",
          STAGE1_BLOCKS_NUM, STAGE1_THREADS_PER_BLOCK, STAGE1_CASES_PER_THREAD);
 
-  std::vector<std::pair<Case, double> > cuda_good_cases;
   auto started = clock::now();
 
   auto seeds = std::make_unique<uint64_t[]>(STAGE1_BLOCKS_NUM * STAGE1_THREADS_PER_BLOCK);
@@ -64,14 +63,14 @@ int main()
   auto result_deviations = std::make_unique<real[]>(STAGE1_N_TOP);
   CudaAdamsMethodManager<(uint32_t)STAGE1_METHOD>
       (*meteorite, seeds.get(), STAGE1_BLOCKS_NUM * STAGE1_THREADS_PER_BLOCK,
-       STAGE1_DT, STAGE1_TIMEOUT, 0.05,
+       STAGE1_DT, STAGE1_TIMEOUT, 0.1,
        STAGE1_BLOCKS_NUM, STAGE1_THREADS_PER_BLOCK,
        BEST_CASES_BUFFER_SIZE, STAGE1_CASES_PER_THREAD,
        result_curand_states.get(), result_deviations.get());
-  
+
   std::vector<std::pair<real, curandState>> pairs;
   pairs.reserve(STAGE1_N_TOP);
-  
+
   printf("Sort best cases...\n");
 
   for (uint32_t i = 0; i < STAGE1_N_TOP; i++)
