@@ -118,7 +118,7 @@ AdamsStep(const real *timestamps, size_t n_timestamps, real &dt, real &timeout,
 }
 
 __device__ inline real
-GPUL2Compute(real *v, real *h, const real *ref_v, const real *ref_h, int size)
+GPUL2Compute(const real *v, const real *h, const real *ref_v, const real *ref_h, int size)
 {
   real v_sum = 0.0, h_sum = 0.0;
 
@@ -201,7 +201,7 @@ AdamsMethodKernel(const uint64_t *seeds,
   real        local_best_cases_devs[BEST_CASES_BUFFER_SIZE];
   for (int i = 0; i < BEST_CASES_BUFFER_SIZE; i++)
   {
-    local_best_cases_devs[i] = std::numeric_limits<double>::max();
+    local_best_cases_devs[i] = std::numeric_limits<real>::max();
   }
   real curr_dev;
 
@@ -216,6 +216,11 @@ AdamsMethodKernel(const uint64_t *seeds,
   {
     GenerateCase(curr_case, curr_state, v0, h0);
 
+    for (size_t i = 0; i < n_timestamps; i++)
+    {
+      v_args[i] = 0;
+      h_args[i] = 0;
+    }
     t = dt * STEPS;
     timestamp = 0;
     nxt = STEPS;
@@ -300,7 +305,7 @@ AdamsMethodBalancedKernel(const uint64_t *seeds,
   real        local_best_cases_devs[BEST_CASES_BUFFER_SIZE];
   for (int i = 0; i < BEST_CASES_BUFFER_SIZE; i++)
   {
-    local_best_cases_devs[i] = std::numeric_limits<double>::max();
+    local_best_cases_devs[i] = std::numeric_limits<real>::max();
   }
   real curr_dev;
 
@@ -313,6 +318,11 @@ AdamsMethodBalancedKernel(const uint64_t *seeds,
 
   GenerateCase(curr_case, curr_state, v0, h0);
 
+  for (size_t i = 0; i < n_timestamps; i++)
+  {
+    v_args[i] = 0;
+    h_args[i] = 0;
+  }
   t = dt * STEPS;
   timestamp = 0;
   nxt = STEPS;
@@ -360,6 +370,11 @@ AdamsMethodBalancedKernel(const uint64_t *seeds,
 
       GenerateCase(curr_case, curr_state, v0, h0);
 
+      for (size_t i = 0; i < n_timestamps; i++)
+      {
+        v_args[i] = 0;
+        h_args[i] = 0;
+      }
       t = dt * STEPS;
       timestamp = 0;
       nxt = STEPS;
