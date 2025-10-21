@@ -1,5 +1,25 @@
 #include "ResultFormatters.h"
 
+//------------------------
+//--- IResultFormatter ---
+//------------------------
+
+IResultFormatter::Reason IResultFormatter::Classify(real t, real M, real h)
+{
+  if (M <= (real)0.01)
+  {
+    return IResultFormatter::Reason::Burnt;
+  }
+  else if (h <= (real)0.0)
+  {
+    return IResultFormatter::Reason::Collided;
+  }
+  else
+  {
+    return IResultFormatter::Reason::Timeouted;
+  }
+}
+
 //--------------------
 //--- CsvFromatter ---
 //--------------------
@@ -40,13 +60,13 @@ real CsvFromatter::Started(const Case &problem)
     throw std::runtime_error(ss.str());
   }
 
-  file_ << "Cd:,"     << problem.Cd()     << "," << std::endl;
-  file_ << "Cl:,"     << problem.Cl()     << "," << std::endl;
-  file_ << "Ch:,"     << problem.Ch()     << "," << std::endl;
-  file_ << "H:,"      << problem.H()      << "," << std::endl;
-  file_ << "Rho:,"    << problem.Rho()    << "," << std::endl;
-  file_ << "Gamma0:," << problem.Gamma0() << "," << std::endl;
-  file_ << "M0:,"     << problem.M0()     << "," << std::endl;
+  file_ << "Cd:,"     << problem.Cd     << "," << std::endl;
+  file_ << "Cl:,"     << problem.Cl     << "," << std::endl;
+  file_ << "Ch:,"     << problem.Ch     << "," << std::endl;
+  file_ << "H:,"      << problem.H      << "," << std::endl;
+  file_ << "Rho:,"    << problem.Rho    << "," << std::endl;
+  file_ << "Gamma0:," << problem.Gamma0 << "," << std::endl;
+  file_ << "M0:,"     << problem.M0     << "," << std::endl;
   file_ << std::endl;
   file_ << "Time," << "Mass," << "Velocity," << "Height," << "Distance," << "Gamma," << std::endl;
 

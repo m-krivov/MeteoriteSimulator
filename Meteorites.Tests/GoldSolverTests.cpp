@@ -54,14 +54,14 @@ TEST_F(GoldTests, Vacuum_VerticalSpeed)
   decltype(auto) log = ExtractLogPtrs<1>(fmt)[0];
   decltype(auto) last_record = log->records[log->records.size() - 1];
       
-  ASSERT_TRUE(std::abs(last_record.M - problem.M0()) < (real)1e-3);
+  ASSERT_TRUE(std::abs(last_record.M - problem.M0) < (real)1e-3);
   constexpr auto a = -Constants::g() / 2.0;
-  auto b = -problem.V0();
-  auto c = problem.h0() - last_record.h;
+  auto b = -problem.V0;
+  auto c = problem.h0 - last_record.h;
   auto d = b * b - 4 * a * c;
   auto t = (-b - std::sqrt(d)) / (2 * a);
   ASSERT_TRUE(std::abs(last_record.t - t) < 1e-2f);
-  ASSERT_TRUE(std::abs(last_record.V - (problem.V0() + Constants::g() * t)) < 1e-1f);
+  ASSERT_TRUE(std::abs(last_record.V - (problem.V0 + Constants::g() * t)) < 1e-1f);
 }
 
 TEST_F(GoldTests, Vacuum_HorizontalSpeed)
@@ -77,13 +77,13 @@ TEST_F(GoldTests, Vacuum_HorizontalSpeed)
   decltype(auto) log = ExtractLogPtrs<1>(fmt)[0];
   decltype(auto) last_record = log->records[log->records.size() - 1];
 
-  ASSERT_TRUE(std::abs(last_record.M - problem.M0()) < (real)1e-3);
+  ASSERT_TRUE(std::abs(last_record.M - problem.M0) < (real)1e-3);
   constexpr auto a = -Constants::g() / 2.0f;
   auto b = (real)0.0;
-  auto c = problem.h0() - last_record.h;
+  auto c = problem.h0 - last_record.h;
   auto d = b * b - 4 * a * c;
   auto t = (-b - std::sqrt(d)) / (2 * a);
-  auto dist = problem.V0() * std::cos(problem.Gamma0()) * t;
+  auto dist = problem.V0 * std::cos(problem.Gamma0) * t;
   ASSERT_TRUE(std::abs(last_record.t - t) < 1e-2f);
   ASSERT_TRUE(std::abs(last_record.V - Constants::g() * t) < 1e-1f);
   ASSERT_TRUE(std::abs(last_record.l - dist) < 2e-1f);

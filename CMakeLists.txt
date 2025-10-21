@@ -18,12 +18,14 @@ else()
 endif()
 
 set(METEORITES_CUDA false CACHE BOOL "Enable CUDA-accelerated solvers")
-if(METEORITES_CUDA)
+if(${METEORITES_CUDA})
   set(CMAKE_CUDA_ARCHITECTURES "native")
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
   set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+  add_compile_definitions(METEORITES_CUDA)
+  include_directories(${CUDAToolkit_INCLUDE_DIRS})
 endif()
 
 set(ROOT_DIR      "${CMAKE_SOURCE_DIR}")
@@ -34,7 +36,7 @@ if(NOT EXISTS ${BIN_DIR})
   file(MAKE_DIRECTORY "${BIN_DIR}")
 endif()
 
-macro(find_cpp_sources dir headers cpp)
+macro(find_cpp_sources dir headers cpp cuda)
   file(GLOB_RECURSE ${headers}   ${dir}/*.h)
   file(GLOB_RECURSE ${cpp}       ${dir}/*.cpp)
   if(${METEORITES_CUDA})
@@ -50,7 +52,7 @@ macro(find_cpp_sources dir headers cpp)
       source_group("Header Files\\${_group_path}" FILES "${_source}")
     endforeach()
 
-    foreach(_source IN ITEMS ${${cpp}})
+    foreach(_source IN ITEMS ${${cpp}} ${${cuda}})
       get_filename_component(_source_path "${_source}" PATH)
       file(RELATIVE_PATH _source_path_rel "${dir}" "${_source_path}")
       string(REPLACE "/" "\\" _group_path "${_source_path_rel}")
@@ -91,27 +93,36 @@ macro(configure_cpp_proj target proj_name)
 endmacro()
 
 
-find_cpp_sources(${ROOT_DIR}/Meteorites.Core METEORITES_CORE_H METEORITES_CORE_CPP)
-add_library(Meteorites.Core STATIC ${METEORITES_CORE_H} ${METEORITES_CORE_CPP})
+find_cpp_sources(${ROOT_DIR}/Meteorites.Core METEORITES_CORE_H METEORITES_CORE_CPP METEORITES_CORE_CU)
+add_library(Meteorites.Core STATIC ${METEORITES_CORE_H} ${METEORITES_CORE_CPP} ${METEORITES_CORE_CU})
 configure_cpp_proj(Meteorites.Core "meteorites.core")
 
-find_cpp_sources(${ROOT_DIR}/Meteorites.CpuSolvers METEORITES_CPU_H METEORITES_CPU_CPP)
-add_library(Meteorites.CpuSolvers STATIC ${METEORITES_CPU_H} ${METEORITES_CPU_CPP})
+find_cpp_sources(${ROOT_DIR}/Meteorites.CpuSolvers METEORITES_CPU_H METEORITES_CPU_CPP METEORITES_CPU_CU)
+add_library(Meteorites.CpuSolvers STATIC ${METEORITES_CPU_H} ${METEORITES_CPU_CPP} ${METEORITES_CPU_CU})
 configure_cpp_proj(Meteorites.CpuSolvers "meteorites.cpu")
 
-find_cpp_sources(${ROOT_DIR}/Meteorites.KnowledgeBase METEORITES_KNOWLEDGE_H METEORITES_KNOWLEDGE_CPP)
-add_library(Meteorites.KnowledgeBase STATIC ${METEORITES_KNOWLEDGE_H} ${METEORITES_KNOWLEDGE_CPP})
+if(${METEORITES_CUDA})
+  find_cpp_sources(${ROOT_DIR}/Meteorites.GpuSolvers METEORITES_GPU_H METEORITES_GPU_CPP METEORITES_GPU_CU)
+  add_library(Meteorites.GpuSolvers STATIC ${METEORITES_GPU_H} ${METEORITES_GPU_CPP} ${METEORITES_GPU_CU})
+  configure_cpp_proj(Meteorites.GpuSolvers "meteorites.gpu")
+endif()
+
+find_cpp_sources(${ROOT_DIR}/Meteorites.KnowledgeBase METEORITES_KNOWLEDGE_H METEORITES_KNOWLEDGE_CPP METEORITES_KNOWLEDGE_CU)
+add_library(Meteorites.KnowledgeBase STATIC ${METEORITES_KNOWLEDGE_H} ${METEORITES_KNOWLEDGE_CPP} ${METEORITES_KNOWLEDGE_CU})
 configure_cpp_proj(Meteorites.KnowledgeBase "meteorites.knowledge")
 
-find_cpp_sources(${ROOT_DIR}/Meteorites.App METEORITES_APP_H METEORITES_APP_CPP)
-add_executable(Meteorites.App ${METEORITES_APP_H} ${METEORITES_APP_CPP})
+find_cpp_sources(${ROOT_DIR}/Meteorites.App METEORITES_APP_H METEORITES_APP_CPP METEORITES_APP_CU)
+add_executable(Meteorites.App ${METEORITES_APP_H} ${METEORITES_APP_CPP} ${METEORITES_APP_CU})
 configure_cpp_proj(Meteorites.App "meteorites"
                    Meteorites.KnowledgeBase
                    Meteorites.CpuSolvers
                    Meteorites.Core)
+if(${METEORITES_CUDA})
+  target_link_libraries(Meteorites.App Meteorites.GpuSolvers)
+endif()
 
-find_cpp_sources(${ROOT_DIR}/Meteorites.Benchmark METEORITES_BENCHMARK_H METEORITES_BENCHMARK_CPP)
-add_executable(Meteorites.Benchmark ${METEORITES_BENCHMARK_H} ${METEORITES_BENCHMARK_CPP})
+find_cpp_sources(${ROOT_DIR}/Meteorites.Benchmark METEORITES_BENCHMARK_H METEORITES_BENCHMARK_CPP METEORITES_BENCHMARK_CU)
+add_executable(Meteorites.Benchmark ${METEORITES_BENCHMARK_H} ${METEORITES_BENCHMARK_CPP} ${METEORITES_BENCHMARK_CU})
 configure_cpp_proj(Meteorites.Benchmark "meteorites.benchmark"
                    Meteorites.KnowledgeBase
                    Meteorites.CpuSolvers
@@ -119,8 +130,8 @@ configure_cpp_proj(Meteorites.Benchmark "meteorites.benchmark"
 
 
 include(3rdParty.cmake)
-find_cpp_sources(${ROOT_DIR}/Meteorites.Tests METEORITES_TESTS_H METEORITES_TESTS_CPP)
-add_executable(Meteorites.Tests ${METEORITES_TESTS_H} ${METEORITES_TESTS_CPP})
+find_cpp_sources(${ROOT_DIR}/Meteorites.Tests METEORITES_TESTS_H METEORITES_TESTS_CPP METEORITES_TESTS_CU)
+add_executable(Meteorites.Tests ${METEORITES_TESTS_H} ${METEORITES_TESTS_CPP} ${METEORITES_TESTS_CU})
 configure_cpp_proj(Meteorites.Tests "meteorites.tests"
                    Meteorites.KnowledgeBase
                    Meteorites.CpuSolvers
