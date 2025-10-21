@@ -2,7 +2,6 @@
 
 #include "Meteorites.Core/Constants.h"
 
-#include "GPUParameters.h"
 
 namespace
 {
