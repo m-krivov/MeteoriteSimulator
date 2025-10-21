@@ -23,6 +23,10 @@ class IResultFormatter
       Timeouted   = 3
     };
 
+    // A helper that determines, why do we stop simulation of a meteorite
+    // TODO: implement as a second version of 'Finished()'
+    static IResultFormatter::Reason Classify(real t, real M, real h);
+
     IResultFormatter(const IResultFormatter &) = delete;
     IResultFormatter &operator =(const IResultFormatter &) = delete;
     virtual ~IResultFormatter() { }

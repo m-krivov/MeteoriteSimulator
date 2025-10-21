@@ -189,8 +189,8 @@ void PrecisionEstimator::ComparePerturbations(const Case &p,
   solver.Configure(method, dt, TIMEOUT);
   std::array<real, 5> peturbations{ (real)0.01, (real)0.02, (real)0.04, (real)0.08, (real)0.16 };
 
-  std::array<real, 9> params{ p.H(), p.Ch(), p.Rho(), p.Cd(), p.Cl(),
-                              p.M0(), p.V0(), p.h0(), p.Gamma0() };
+  std::array<real, 9> params{ p.H, p.Ch, p.Rho, p.Cd, p.Cl,
+                              p.M0, p.V0, p.h0, p.Gamma0 };
   std::array<std::string, 9> names{ "H", "Ch", "Rho", "Cd", "Cl",
                                     "M0", "V0", "h0", "Gamma0" };
 

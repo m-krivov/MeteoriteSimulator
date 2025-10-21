@@ -8,12 +8,17 @@
 #include "Meteorites.KnowledgeBase/PossibleParameters.h"
 #include "Meteorites.KnowledgeBase/MonteCarloGenerator.h"
 
-constexpr auto METEORITE         = KnownMeteorites::ID::LOST_CITY;
-constexpr auto PARAMETERS        = Distribution::UNIFORM_ANY;
-constexpr uint32_t SEED          = 25102018;
-constexpr real TIMEOUT           = (real)60.0 * 30;
+#if defined(METEORITES_CUDA)
+  #include "Meteorites.GpuSolvers/CudaSolver.h"
+#endif
 
-constexpr size_t STAGE1_N_TOTAL  = 100000;
+
+constexpr auto   METEORITE       = KnownMeteorites::ID::INNISFREE;
+constexpr auto   PARAMETERS      = Distribution::UNIFORM_ANY;
+constexpr uint32_t SEED          = 25102018;
+constexpr real   TIMEOUT         = (real)60.0 * 30;
+
+constexpr size_t STAGE1_N_TOTAL  = 1000000;
 constexpr size_t STAGE1_N_TOP    = 100;
 constexpr auto   STAGE1_METHOD   = NumericalAlgorithm::TWO_STEP_ADAMS;
 constexpr real   STAGE1_DT       = (real)1e-3;
@@ -21,12 +26,16 @@ constexpr real   STAGE1_DT       = (real)1e-3;
 constexpr auto   STAGE2_METHOD   = NumericalAlgorithm::THREE_STEP_ADAMS;
 constexpr real   STAGE2_DT       = (real)1e-4;
 
+#if defined(METEORITES_CUDA)
+  constexpr bool   USE_GPU = true;
+#endif
 
-int main(int argc, char *argv[])
+
+int main()
 {
   using clock = std::chrono::high_resolution_clock;
 
-  decltype(auto) meteorite = *KnownMeteorites::Get(METEORITE);
+  decltype(auto) meteorite = KnownMeteorites::Get(METEORITE);
   decltype(auto) params    = PossibleParameters::Get(PARAMETERS);
   auto progress_callback = [](float) -> void {
     std::cout << '#';
@@ -39,7 +48,7 @@ int main(int argc, char *argv[])
   {
     size_t records;
     const real *time, *v, *h;
-    meteorite.Trajectory(records, time, v, h);
+    meteorite->Trajectory(records, time, v, h);
     t_end = time[records - 1];
   }
 
@@ -54,14 +63,21 @@ int main(int argc, char *argv[])
   std::vector<std::pair<Case, double> > good_cases;
   auto started = clock::now();
   {
-    MonteCarloGenerator cases(meteorite, params, STAGE1_N_TOTAL, SEED);
+    MonteCarloGenerator cases(*meteorite, params, STAGE1_N_TOTAL, SEED);
     cases.OnProgress(progress_callback, 0.01f);
-    L2Functional functional(meteorite);
+    L2Functional functional(*meteorite);
     MetaFormatter meta_fmt(STAGE1_N_TOP, STAGE1_N_TOP * 10);
 
-    GoldSolver solver;
-    solver.Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
-    solver.Solve(cases, functional, meta_fmt);
+    std::unique_ptr<ISolver> solver;
+  #if defined(METEORITES_CUDA)
+    if constexpr (USE_GPU)
+    { solver.reset(new CudaSolver()); }
+    else
+  #endif
+    { solver.reset(new GoldSolver()); }
+
+    solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
+    solver->Solve(cases, functional, meta_fmt);
     
     meta_fmt.ExportAndReset(good_cases);
     assert(good_cases.size() == STAGE1_N_TOP);
@@ -70,7 +86,7 @@ int main(int argc, char *argv[])
   std::cout << std::endl;
   std::cout << "Done in " << std::chrono::duration_cast<std::chrono::minutes>(ended - started).count()
             << " minutes" << std::endl << std::endl;
-
+            
   // Stage 2.
   // Recompute them with better precision, store as tables
   std::cout << "Stage 2. Recomputing trajectories of the best virtual meteorites with high precision";
@@ -84,8 +100,8 @@ int main(int argc, char *argv[])
     GoldSolver solver;
     solver.Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
 
-    L2Functional functional(meteorite);
-    CsvFromatter csv_fmt(meteorite.Name(), 0.01f);
+    L2Functional functional(*meteorite);
+    CsvFromatter csv_fmt(meteorite->Name(), 0.01f);
     size_t on_progress = good_cases.size() / 100;
     for (size_t i = 0; i < good_cases.size(); i++)
     {
