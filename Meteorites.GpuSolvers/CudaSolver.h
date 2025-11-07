@@ -31,17 +31,17 @@ class CudaSolver : public BasicSolver
     virtual ~CudaSolver();
 
     // ISolver method
-    virtual void Solve(const Case &problem,
+    virtual void Solve(const VirtualMeteoroid &problem,
                        const IFunctional &functional,
                        IResultFormatter &results) override final;
 
     // ISolver method
-    virtual void Solve(const std::vector<Case> &problems,
+    virtual void Solve(const std::vector<VirtualMeteoroid> &problems,
                        const IFunctional &functional,
                        IResultFormatter &results) override final;
 
     // ISolver method
-    virtual void Solve(ICaseGenerator &generator,
+    virtual void Solve(IMeteoroidGenerator &generator,
                        const IFunctional &functional,
                        IResultFormatter &results) override final;
   private:

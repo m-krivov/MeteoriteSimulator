@@ -10,7 +10,7 @@ class GoldSolver : public BasicSolver
     GoldSolver() = default;
 
     // ISolver method
-    virtual void Solve(const Case &problem,
+    virtual void Solve(const VirtualMeteoroid &problem,
                        const IFunctional &functional,
                        IResultFormatter &results) override final;
 };

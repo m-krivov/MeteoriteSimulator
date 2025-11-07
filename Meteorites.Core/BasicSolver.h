@@ -10,12 +10,12 @@ class BasicSolver : public ISolver
     virtual void Configure(NumericalAlgorithm alg, real dt, real timeout) override final;
 
     // ISolver method
-    virtual void Solve(const std::vector<Case> &problems,
+    virtual void Solve(const std::vector<VirtualMeteoroid> &problems,
                        const IFunctional &functional,
                        IResultFormatter &results) override;
 
     // ISolver method
-    virtual void Solve(ICaseGenerator &generator,
+    virtual void Solve(IMeteoroidGenerator &generator,
                        const IFunctional &functional,
                        IResultFormatter &results) override;
 

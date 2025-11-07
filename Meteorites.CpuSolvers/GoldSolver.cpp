@@ -7,7 +7,7 @@ namespace
 
 // An unified implementation for one-step, two-step and three-step Adams method
 template <unsigned int STEPS>
-void AdamsMethod(const Case &problem, const IFunctional &functional, real dt, real timeout,
+void AdamsMethod(const VirtualMeteoroid &problem, const IFunctional &functional, real dt, real timeout,
                  IResultFormatter &results)
 {
   assert(1u <= STEPS && STEPS <= 3u);   // not adapted for other steps
@@ -102,7 +102,7 @@ void AdamsMethod(const Case &problem, const IFunctional &functional, real dt, re
 } // unnamed namespace
 
 
-void GoldSolver::Solve(const Case &problem, const IFunctional &functional, IResultFormatter &results)
+void GoldSolver::Solve(const VirtualMeteoroid &problem, const IFunctional &functional, IResultFormatter &results)
 {
   switch (Algorithm())
   {

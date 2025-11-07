@@ -112,10 +112,33 @@ macro(fetch_3rd_party
   
 endmacro()
 
+# Downloads some release of a simple header-only library and creates a target for it
+macro(download_3rd_party name src_url header_subdir)
+  set(_TARGET_DIR "${3RDPARTY_DIR}/${name}")
+  get_filename_component("${src_url}" _TARGET_EXT NAME_WLE)
+  if(NOT EXISTS "${_TARGET_DIR}")
+    message(STATUS "Downloading a header-only library (${name}) ...")
+    file(DOWNLOAD "${src_url}" "${_TARGET_DIR}/src${_TARGET_EXT}")
+    file(ARCHIVE_EXTRACT
+         INPUT "${_TARGET_DIR}/src${_TARGET_EXT}"
+         DESTINATION "${_TARGET_DIR}")
+    file(REMOVE "${_TARGET_DIR}/src${_TARGET_EXT}")
+  endif()
+
+  add_library(${name} INTERFACE)
+  if("${header_subdir}" STREQUAL "")
+    target_include_directories(${name} SYSTEM INTERFACE "${_TARGET_DIR}")
+  else()
+    target_include_directories(${name} SYSTEM INTERFACE "${_TARGET_DIR}/${header_subdir}")
+  endif()
+endmacro()
+
 if(NOT EXISTS ${3RDPARTY_DIR})
   file(MAKE_DIRECTORY "${3RDPARTY_DIR}")
 endif()
 
+
+### GoogleTest ###
 
 if(MSVC)
   fetch_3rd_party("https://github.com/google/googletest.git"
@@ -126,12 +149,19 @@ if(MSVC)
                   "lib/Debug/gtestd.lib")
 else()
   fetch_3rd_party("https://github.com/google/googletest.git"
-                    "2f3e2e39cc4c399b66711e6b720bf22373e841b5"
-                    googletest
-                    "googletest/include"
-                    "lib/libgtest.a"
-                    "lib/libgtest.a")
+                  "2f3e2e39cc4c399b66711e6b720bf22373e841b5"
+                  googletest
+                  "googletest/include"
+                  "lib/libgtest.a"
+                  "lib/libgtest.a")
 endif()
 set(GTEST_ROOT  "${3RDPARTY_DIR}/${googletest}")
 set(GTest_FOUND true)
 include(GoogleTest)
+
+### Indicators ###
+
+set(INDICATORS_VER "2.3")
+download_3rd_party(indicators
+                   "https://github.com/p-ranav/indicators/archive/refs/tags/v${INDICATORS_VER}.zip"
+                   "indicators-${INDICATORS_VER}/include")

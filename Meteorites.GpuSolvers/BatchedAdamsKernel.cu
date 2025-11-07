@@ -7,7 +7,7 @@ namespace
 {
 
 template <unsigned int STEPS>
-__device__ void InitContext(ThreadContext<STEPS> &ctx, const Case &meteoroid, real dt, size_t idx,
+__device__ void InitContext(ThreadContext<STEPS> &ctx, const VirtualMeteoroid &meteoroid, real dt, size_t idx,
                             Record *&record)
 {
   Adams::Unchangeable params(meteoroid);
@@ -56,7 +56,7 @@ __device__ void InitContext(ThreadContext<STEPS> &ctx, const Case &meteoroid, re
 
 template <unsigned int STEPS>
 __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_threads,
-                            const Case *problems, size_t n_problems,
+                            const VirtualMeteoroid *problems, size_t n_problems,
                             real dt, real timeout,
                             const real *timestamps, size_t n_timestamps,
                             real *functional_args, Record *records,
@@ -71,7 +71,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_thr
   if (ctx.ended)
   { return; }
 
-  const Case &meteoroid = problems[idx];
+  const VirtualMeteoroid &meteoroid = problems[idx];
   Record *record = records + iterations * idx;
   real t;
   real *V_arg, *h_arg;
@@ -80,7 +80,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_thr
 
   // Restore context
   Adams::Unchangeable params(meteoroid);
-  if (ctx.t == 0.0) // new case
+  if (ctx.t == 0.0) // new meteoroid
   {
     InitContext(ctx, meteoroid, dt, idx, record);
     t = dt * (real)STEPS;
@@ -88,7 +88,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_thr
     timestamp = 0;
     iters_count = STEPS + 1;
   }
-  else // old case
+  else // previous meteoroid
   {
     t = ctx.t;
     nxt = ctx.nxt;
@@ -143,7 +143,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_thr
 
 template <unsigned int STEPS>
 void BatchedAdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_threads,
-                        const Case *problems, size_t n_problems,
+                        const VirtualMeteoroid *problems, size_t n_problems,
                         real dt, real timeout, const real *timestamps, size_t n_timestamps,
                         real *functional_args, Record *records,
                         size_t iterations, size_t threads_per_block)
@@ -163,19 +163,19 @@ void BatchedAdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_threads
 
 template
 void BatchedAdamsKernel<1u>(ThreadContext<1u> *contexts, uint32_t *active_threads,
-                            const Case *problems, size_t n_problems, real dt, real timeout,
+                            const VirtualMeteoroid *problems, size_t n_problems, real dt, real timeout,
                             const real *timestamps, size_t n_timestamps,
                             real *functional_args, Record *records,
                             size_t iterations, size_t threads_per_block);
 template
 void BatchedAdamsKernel<2u>(ThreadContext<2u> *contexts, uint32_t *active_threads,
-                            const Case *problems, size_t n_problems, real dt, real timeout,
+                            const VirtualMeteoroid *problems, size_t n_problems, real dt, real timeout,
                             const real *timestamps, size_t n_timestamps,
                             real *functional_args, Record *records,
                             size_t iterations, size_t threads_per_block);
 template
 void BatchedAdamsKernel<3u>(ThreadContext<3u> *contexts, uint32_t *active_threads,
-                            const Case *problems, size_t n_problems, real dt, real timeout,
+                            const VirtualMeteoroid *problems, size_t n_problems, real dt, real timeout,
                             const real *timestamps, size_t n_timestamps,
                             real *functional_args, Record *records,
                             size_t iterations, size_t threads_per_block);

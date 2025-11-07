@@ -63,15 +63,15 @@ class Enumerator
 };
 
 
-// Performs simulation for a batch of all cases
+// Performs simulation for a batch of all virtual meteoroids
 // Expects that all buffers points to device-accessible memory and have valid sizes
 template <uint32_t STEPS>
-void BatchedAdams(const std::vector<Case> &problems, real dt, real timeout,
+void BatchedAdams(const std::vector<VirtualMeteoroid> &problems, real dt, real timeout,
                   const IFunctional &functional, IResultFormatter &results,
 
                   size_t batch_size, size_t iterations_per_batch, size_t threads_per_block,
 
-                  uint32_t *dev_active_meteorites, Case *dev_problems,
+                  uint32_t *dev_active_meteorites, VirtualMeteoroid *dev_problems,
                   ThreadContext<STEPS> *dev_contexts, Record *dev_records,
                   real *dev_timestamps, real *dev_functional_args)
 {
@@ -104,7 +104,7 @@ void BatchedAdams(const std::vector<Case> &problems, real dt, real timeout,
     HANDLE_ERROR(cudaMemcpy(dev_active_meteorites, &active_meteorites,
                             sizeof(uint32_t), cudaMemcpyHostToDevice));
     HANDLE_ERROR(cudaMemcpy(dev_problems, problems.data() + batch * batch_size,
-                            sizeof(Case) * n_meteorites, cudaMemcpyHostToDevice));
+                            sizeof(VirtualMeteoroid) * n_meteorites, cudaMemcpyHostToDevice));
 
     // Perform Adams' iterations while at least one thread of the batch is active
     std::vector<std::unique_ptr<Record[]>> records;
@@ -175,7 +175,7 @@ CudaSolver::CudaSolver(CudaSolverConfig config)
 
   size_t batch_size = BatchSize();
   HANDLE_ERROR(CudaAlloc(buffer_counter_, sizeof(uint32_t)));
-  HANDLE_ERROR(CudaAlloc(buffer_problems_, batch_size * sizeof(Case)));
+  HANDLE_ERROR(CudaAlloc(buffer_problems_, batch_size * sizeof(VirtualMeteoroid)));
   HANDLE_ERROR(CudaAlloc(buffer_contexts_, batch_size * sizeof(ThreadContext<3>)));
   HANDLE_ERROR(CudaAlloc(buffer_records_,  batch_size * config_.iterations_per_block * sizeof(Record)));
 }
@@ -202,18 +202,17 @@ size_t CudaSolver::BatchSize() const
   return config_.threads_per_block * config_.blocks_per_sm * props_.multiProcessorCount;
 }
 
-void CudaSolver::Solve(ICaseGenerator &generator, const IFunctional &functional, IResultFormatter &results)
+void CudaSolver::Solve(IMeteoroidGenerator &generator, const IFunctional &functional, IResultFormatter &results)
 {
-  Case problem;
-  std::vector<Case> problems;
+  std::vector<VirtualMeteoroid> problems;
   size_t batch_size = BatchSize();
 
   problems.reserve(batch_size);
   do
   {
     problems.clear();
-    while (problems.size() < batch_size && generator.Next(problem))
-    { problems.emplace_back(std::move(problem)); }
+    while (problems.size() < batch_size && generator.MoveNext())
+    { problems.emplace_back(generator.Current()); }
 
     if (!problems.empty())
     { Solve(problems, functional, results); }
@@ -221,7 +220,7 @@ void CudaSolver::Solve(ICaseGenerator &generator, const IFunctional &functional,
   while (!problems.empty());
 }
 
-void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &functional, IResultFormatter &results)
+void CudaSolver::Solve(const std::vector<VirtualMeteoroid> &problems, const IFunctional &functional, IResultFormatter &results)
 {
   // Resize buffers for functional arguments and timestamps (if needed)
   size_t n_timestamps{};
@@ -243,7 +242,7 @@ void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &fun
     case NumericalAlgorithm::ONE_STEP_ADAMS:
       BatchedAdams<1>(problems, Dt(), Timeout(), functional, results,
                       BatchSize(), config_.iterations_per_block, config_.threads_per_block,
-                      (uint32_t *)buffer_counter_.get(), (Case *)buffer_problems_.get(),
+                      (uint32_t *)buffer_counter_.get(), (VirtualMeteoroid *)buffer_problems_.get(),
                       (ThreadContext<1> *)buffer_contexts_.get(), (Record *)buffer_records_.get(),
                       (real *)buffer_timestamps_.get(), (real *)buffer_functional_.get());
       break;
@@ -251,7 +250,7 @@ void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &fun
     case NumericalAlgorithm::TWO_STEP_ADAMS:
       BatchedAdams<2>(problems, Dt(), Timeout(), functional, results,
                       BatchSize(), config_.iterations_per_block, config_.threads_per_block,
-                      (uint32_t *)buffer_counter_.get(), (Case *)buffer_problems_.get(),
+                      (uint32_t *)buffer_counter_.get(), (VirtualMeteoroid *)buffer_problems_.get(),
                       (ThreadContext<2> *)buffer_contexts_.get(), (Record *)buffer_records_.get(),
                       (real *)buffer_timestamps_.get(), (real *)buffer_functional_.get());
       break;
@@ -259,7 +258,7 @@ void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &fun
     case NumericalAlgorithm::THREE_STEP_ADAMS:
       BatchedAdams<3>(problems, Dt(), Timeout(), functional, results,
                       BatchSize(), config_.iterations_per_block, config_.threads_per_block,
-                      (uint32_t *)buffer_counter_.get(), (Case *)buffer_problems_.get(),
+                      (uint32_t *)buffer_counter_.get(), (VirtualMeteoroid *)buffer_problems_.get(),
                       (ThreadContext<3> *)buffer_contexts_.get(), (Record *)buffer_records_.get(),
                       (real *)buffer_timestamps_.get(), (real *)buffer_functional_.get());
       break;
@@ -269,8 +268,8 @@ void CudaSolver::Solve(const std::vector<Case> &problems, const IFunctional &fun
   }
 }
 
-void CudaSolver::Solve(const Case &problem, const IFunctional &functional, IResultFormatter &results)
+void CudaSolver::Solve(const VirtualMeteoroid &problem, const IFunctional &functional, IResultFormatter &results)
 {
-  std::vector<Case> problems = { problem };
+  std::vector<VirtualMeteoroid> problems = { problem };
   Solve(problems, functional, results);
 }

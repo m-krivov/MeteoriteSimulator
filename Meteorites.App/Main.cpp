@@ -1,8 +1,11 @@
 #include <chrono>
 #include <iostream>
+#include <indicators/cursor_control.hpp>
+#include <indicators/progress_bar.hpp>
 
 #include "Meteorites.Core/Functionals.h"
 #include "Meteorites.Core/ResultFormatters.h"
+#include "Meteorites.Core/Meteoroids/CollectionMeteoroidGenerator.h"
 #include "Meteorites.CpuSolvers/GoldSolver.h"
 #include "Meteorites.KnowledgeBase/KnownMeteorites.h"
 #include "Meteorites.KnowledgeBase/PossibleParameters.h"
@@ -31,6 +34,24 @@ constexpr real   STAGE2_DT       = (real)1e-4;
 #endif
 
 
+// Configure progress bar from a 3rd-party library
+// Just an old-school bars without colors and animations
+class MyProgressBar : public indicators::ProgressBar
+{
+  public:
+    MyProgressBar()
+      : ProgressBar(indicators::option::BarWidth{ 60 },
+                    indicators::option::Fill{ "#" },
+                    indicators::option::Lead{ "#" },
+                    indicators::option::Remainder{ "-" },
+                    indicators::option::PrefixText{ "     " },
+                    indicators::option::ShowPercentage{ true },
+                    indicators::option::ShowElapsedTime{ true },
+                    indicators::option::ShowRemainingTime{ true })
+    { }
+};
+
+
 int main()
 {
   using clock = std::chrono::high_resolution_clock;
@@ -52,73 +73,70 @@ int main()
     t_end = time[records - 1];
   }
 
-  // Stage 1.
-  // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteorites, select 'STAGE1_N_TOTAL' best of them
-  std::cout << "Stage 1. Computing huge amount of virtual meteorites with low precision";
-  std::cout << std::endl;
-  std::cout << "     Cases:  " << STAGE1_N_TOTAL   << " pcs" << std::endl;
-  std::cout << "     Method: " << (uint32_t)STAGE1_METHOD << "-step Adams" << std::endl;
-  std::cout << "     dt:     " << STAGE1_DT << " seconds" << std::endl;
-  std::cout << "Progress: ";
-  std::vector<std::pair<Case, double> > good_cases;
-  auto started = clock::now();
+  indicators::show_console_cursor(false);
+  try
   {
-    MonteCarloGenerator cases(*meteorite, params, STAGE1_N_TOTAL, SEED);
-    cases.OnProgress(progress_callback, 0.01f);
-    L2Functional functional(*meteorite);
-    MetaFormatter meta_fmt(STAGE1_N_TOP, STAGE1_N_TOP * 10);
-
-    std::unique_ptr<ISolver> solver;
-  #if defined(METEORITES_CUDA)
-    if constexpr (USE_GPU)
-    { solver.reset(new CudaSolver()); }
-    else
-  #endif
-    { solver.reset(new GoldSolver()); }
-
-    solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
-    solver->Solve(cases, functional, meta_fmt);
-    
-    meta_fmt.ExportAndReset(good_cases);
-    assert(good_cases.size() == STAGE1_N_TOP);
-  }
-  auto ended = clock::now();
-  std::cout << std::endl;
-  std::cout << "Done in " << std::chrono::duration_cast<std::chrono::minutes>(ended - started).count()
-            << " minutes" << std::endl << std::endl;
-            
-  // Stage 2.
-  // Recompute them with better precision, store as tables
-  std::cout << "Stage 2. Recomputing trajectories of the best virtual meteorites with high precision";
-  std::cout << std::endl;
-  std::cout << "     Cases:  " << STAGE1_N_TOP << " pcs" << std::endl;
-  std::cout << "     Method: " << (uint32_t)STAGE2_METHOD << "-step Adams" << std::endl;
-  std::cout << "     dt:     " << STAGE2_DT << " seconds" << std::endl;
-  std::cout << "Progress: ";
-  started = clock::now();
-  {
-    GoldSolver solver;
-    solver.Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
-
-    L2Functional functional(*meteorite);
-    CsvFromatter csv_fmt(meteorite->Name(), 0.01f);
-    size_t on_progress = good_cases.size() / 100;
-    for (size_t i = 0; i < good_cases.size(); i++)
+    // Stage 1.
+    // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteoroids, select 'STAGE1_N_TOTAL' best of them
+    std::cout << "Stage 1. Computing huge amount of virtual meteoroids with low precision";
+    std::cout << std::endl;
+    std::cout << "     Meteoroids: " << STAGE1_N_TOTAL   << " pcs" << std::endl;
+    std::cout << "     Method:     " << (uint32_t)STAGE1_METHOD << "-step Adams" << std::endl;
+    std::cout << "     dt:         " << STAGE1_DT << " seconds" << std::endl;
+    std::vector<std::pair<VirtualMeteoroid, double> > good_meteoroids;
     {
-      if (i >= on_progress)
-      {
-        on_progress += good_cases.size() / 100;
-        std::cout << "#";
-        std::cout.flush();
-      }
-      solver.Solve(good_cases[i].first, functional, csv_fmt);
-    }
-  }
-  std::cout << "#";
-  ended = clock::now();
-  std::cout << std::endl;
-  std::cout << "Done in " << std::chrono::duration_cast<std::chrono::minutes>(ended - started).count()
-            << " minutes" << std::endl << std::endl;
+      MonteCarloGenerator generator(*meteorite, params, STAGE1_N_TOTAL, SEED);
+      generator.OnProgress
+      (
+        [bar = std::make_shared<MyProgressBar>()](float progress) mutable -> void
+        { bar->set_progress((size_t)(100 * progress)); }, 0.01f
+      );
+      L2Functional functional(*meteorite);
+      MetaFormatter meta_fmt(STAGE1_N_TOP, STAGE1_N_TOP * 10);
 
+      std::unique_ptr<ISolver> solver;
+    #if defined(METEORITES_CUDA)
+      if constexpr (USE_GPU)
+      { solver.reset(new CudaSolver()); }
+      else
+    #endif
+      { solver.reset(new GoldSolver()); }
+
+      solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
+      solver->Solve(generator, functional, meta_fmt);
+    
+      meta_fmt.ExportAndReset(good_meteoroids);
+      assert(good_meteoroids.size() == STAGE1_N_TOP);
+    }
+    std::cout << std::endl;
+
+    // Stage 2.
+    // Recompute them with better precision, store as tables
+    std::cout << "Stage 2. Recomputing trajectories of the best virtual meteoroids with high precision";
+    std::cout << std::endl;
+    std::cout << "     Meteoroids: " << STAGE1_N_TOP << " pcs" << std::endl;
+    std::cout << "     Method:     " << (uint32_t)STAGE2_METHOD << "-step Adams" << std::endl;
+    std::cout << "     dt:         " << STAGE2_DT << " seconds" << std::endl;
+    {
+      GoldSolver solver;
+      solver.Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
+
+      L2Functional functional(*meteorite);
+      CsvFromatter csv_fmt(meteorite->Name(), 0.01f);
+      CollectionMeteoroidGenerator generator(good_meteoroids);
+      generator.OnProgress
+      (
+        [bar = std::make_shared<MyProgressBar>()](float progress) mutable -> void
+        { bar->set_progress((size_t)(100 * progress)); }, 0.01f
+      );
+      ((ISolver &)solver).Solve(generator, functional, csv_fmt);
+    }
+    std::cout << std::endl;
+    std::cout << "Success!" << std::endl;
+  }
+  catch (std::exception &ex)
+  { std::cerr << "Error: " << ex.what(); }
+  indicators::show_console_cursor(true);
+  
   return 0;
 }

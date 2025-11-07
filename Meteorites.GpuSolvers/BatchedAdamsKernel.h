@@ -1,8 +1,8 @@
 #pragma once
 #include "Meteorites.GpuSolvers/CudaDefs.h"
 
-#include "Meteorites.Core/Case.h"
 #include "Meteorites.Core/Adams.h"
+#include "Meteorites.Core/Meteoroids/VirtualMeteoroid.h"
 
 // Contains a few values extracted from Adams::Layer
 // They could be passed to formatters
@@ -28,7 +28,7 @@ template <uint32_t STEPS>
 struct ThreadContext
 {
   Adams::Layer steps[STEPS + 1];
-  Case params{};
+  VirtualMeteoroid params{};
   size_t nxt{};
   real t{};
   size_t timestamp{};
@@ -42,7 +42,7 @@ struct ThreadContext
 
 template <unsigned int STEPS>
 void BatchedAdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_threads,
-                        const Case *problems, size_t n_problems, real dt, real timeout,
+                        const VirtualMeteoroid *problems, size_t n_problems, real dt, real timeout,
                         const real *timestamps, size_t n_timestamps,
                         real *functional_args, Record *records,
                         size_t iterations, size_t threads_per_block);

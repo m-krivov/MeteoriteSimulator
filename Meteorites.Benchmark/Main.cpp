@@ -13,14 +13,14 @@ int main()
   assert(points > 0);
 
   decltype(auto) params = PossibleParameters::Get(Distribution::UNIFORM_ANY);
-  Case problem((params.H().first + params.H().second) / 2,
-               (params.Ch().first + params.Ch().second) / 2,
-               (params.Rho().first + params.Rho().second) / 2,
-               (params.Cd().first + params.Cd().second) / 2,
-               (params.Cl().first + params.Cl().second) / 2,
-               (params.M0().first + params.M0().second) / 2,
-               v[0], h[0],
-               (params.Gamma0().first + params.Gamma0().second) / 2);
+  VirtualMeteoroid problem((params.H().first + params.H().second) / 2,
+                           (params.Ch().first + params.Ch().second) / 2,
+                           (params.Rho().first + params.Rho().second) / 2,
+                           (params.Cd().first + params.Cd().second) / 2,
+                           (params.Cl().first + params.Cl().second) / 2,
+                           (params.M0().first + params.M0().second) / 2,
+                           v[0], h[0],
+                           (params.Gamma0().first + params.Gamma0().second) / 2);
 
   PrecisionEstimator precision;
   std::cout << "Mode: FP" << (sizeof(real) == 4 ? "32" : "64") << std::endl << std::endl;

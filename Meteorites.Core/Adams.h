@@ -1,7 +1,7 @@
 #pragma once
 #include "Meteorites.Core/Defs.h"
 
-#include "Meteorites.Core/Case.h"
+#include "Meteorites.Core/Meteoroids/VirtualMeteoroid.h"
 #include "Meteorites.Core/Constants.h"
 
 namespace Adams
@@ -19,7 +19,7 @@ struct Unchangeable
   real R   = (real)0.0;
 
   Unchangeable() = default;
-  DEVICE Unchangeable(const Case &problem)
+  DEVICE Unchangeable(const VirtualMeteoroid &problem)
     : H{ problem.H },
       Ch{ problem.Ch },
       Cd{ problem.Cd },

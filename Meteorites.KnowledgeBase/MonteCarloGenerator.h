@@ -1,29 +1,35 @@
 #pragma once
 #include "Meteorites.Core/Defs.h"
+
 #include "Meteorites.Core/ParameterSet.h"
 #include "Meteorites.Core/IMeteorite.h"
-#include "Meteorites.Core/ICaseGenerator.h"
+#include "Meteorites.Core/Meteoroids/BasicMeteoroidGenerator.h"
 
-// Generates the required number of random cases
-class MonteCarloGenerator : public ICaseGenerator
+// Generates the required number of random meteoroids using the Monte-Carlo method
+class MonteCarloGenerator : public BasicMeteoroidGenerator
 {
   public:
     MonteCarloGenerator(const IMeteorite &meteorite,
                         const ParameterSet &range,
-                        size_t n_cases, uint32_t seed);
+                        size_t n_cases, uint64_t seed);
 
-    virtual void OnProgress(const std::function<void(float)> &callback, float step) override;
+    // The member of 'IMeteoroidGenerator'
+    virtual bool MoveNext() override;
 
-    virtual bool Next(Case &problem) override;
+    // The member of 'IMeteoroidGenerator'
+    virtual const VirtualMeteoroid &Current() const override { return current_; }
+
+    // The member of 'IMeteoroidGenerator'
+    virtual void Reset() override;
 
   private:
-    mutable std::mt19937 gen_;
-    std::uniform_real_distribution<real> dist_;
+    uint64_t seed_{};
+    mutable std::mt19937 gen_{};
+    std::uniform_real_distribution<real> dist_{};
+
+    VirtualMeteoroid current_{};
 
     ParameterSet range_;
-    real v0_, h0_;
-    size_t cur_, n_cases_;
-
-    std::function<void(float)> callback_;
-    float step_, threshold_;
+    real v0_{}, h0_{};
+    size_t case_{}, n_cases_{};
 };

@@ -73,10 +73,7 @@ macro(configure_cpp_proj target proj_name)
     math(EXPR arg_num ${arg_num}-1)
     foreach(i RANGE 0 ${arg_num})
       list(GET args ${i} arg)
-      get_target_property(arg_type ${arg} TYPE)
-      if(arg_type STREQUAL "STATIC_LIBRARY")
-        target_link_libraries(${target} ${arg})
-      endif()
+      target_link_libraries(${target} ${arg})
     endforeach(i)
   endif()
 
@@ -92,6 +89,8 @@ macro(configure_cpp_proj target proj_name)
   endif()
 endmacro()
 
+
+include(3rdParty.cmake)
 
 find_cpp_sources(${ROOT_DIR}/Meteorites.Core METEORITES_CORE_H METEORITES_CORE_CPP METEORITES_CORE_CU)
 add_library(Meteorites.Core STATIC ${METEORITES_CORE_H} ${METEORITES_CORE_CPP} ${METEORITES_CORE_CU})
@@ -116,7 +115,8 @@ add_executable(Meteorites.App ${METEORITES_APP_H} ${METEORITES_APP_CPP} ${METEOR
 configure_cpp_proj(Meteorites.App "meteorites"
                    Meteorites.KnowledgeBase
                    Meteorites.CpuSolvers
-                   Meteorites.Core)
+                   Meteorites.Core
+                   indicators)
 if(${METEORITES_CUDA})
   target_link_libraries(Meteorites.App Meteorites.GpuSolvers)
 endif()
@@ -129,7 +129,6 @@ configure_cpp_proj(Meteorites.Benchmark "meteorites.benchmark"
                    Meteorites.Core)
 
 
-include(3rdParty.cmake)
 find_cpp_sources(${ROOT_DIR}/Meteorites.Tests METEORITES_TESTS_H METEORITES_TESTS_CPP METEORITES_TESTS_CU)
 add_executable(Meteorites.Tests ${METEORITES_TESTS_H} ${METEORITES_TESTS_CPP} ${METEORITES_TESTS_CU})
 configure_cpp_proj(Meteorites.Tests "meteorites.tests"

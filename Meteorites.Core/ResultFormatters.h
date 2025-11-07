@@ -1,6 +1,7 @@
 #pragma once
 #include "Defs.h"
-#include "Case.h"
+
+#include "Meteorites.Core/Meteoroids/VirtualMeteoroid.h"
 
 // Interface that saves the numerically computed values
 class IResultFormatter
@@ -34,7 +35,7 @@ class IResultFormatter
     // Notifies that simulation is started, data will be coming soon
     // Provides problem that are going to be simulated
     // Returns the expected time of the first record (take a look at 'Store()')
-    virtual real Started(const Case &problem) = 0;
+    virtual real Started(const VirtualMeteoroid &problem) = 0;
 
     // Makes single record about meteorite state
     // Returns the proposed time of the next record, e.g.
@@ -60,7 +61,7 @@ class CsvFromatter : public IResultFormatter
     ~CsvFromatter();
 
     // IResultFormatter member
-    virtual real Started(const Case &problem) override;
+    virtual real Started(const VirtualMeteoroid &problem) override;
 
     // IResultFormatter member
     virtual real Store(real t, real m, real v, real h, real l, real gamma) override;
@@ -95,12 +96,12 @@ class BufferingFormatter : public IResultFormatter
     struct Log
     {
       Log() : reason(Reason::NA), accuracy(std::numeric_limits<double>::max()) { }
-      Log(const Case &problem_)
+      Log(const VirtualMeteoroid &problem_)
         : problem(problem_), reason(Reason::NA), accuracy(std::numeric_limits<double>::max()) { }
       Log(const Log &) = default;
       Log &operator =(const Log &) = default;
 
-      Case problem;
+      VirtualMeteoroid problem;
       std::vector<Record> records;
       Reason reason;
       double accuracy;
@@ -110,7 +111,7 @@ class BufferingFormatter : public IResultFormatter
     BufferingFormatter(real dt);
 
     // IResultFormatter member
-    virtual real Started(const Case &problem) override;
+    virtual real Started(const VirtualMeteoroid &problem) override;
 
     // IResultFormatter member
     virtual real Store(real t, real m, real v, real h, real l, real gamma) override;
@@ -138,7 +139,7 @@ class MetaFormatter : public IResultFormatter
     MetaFormatter(size_t n_best, size_t buffer_size);
 
     // IResultFormatter member
-    virtual real Started(const Case &problem) override;
+    virtual real Started(const VirtualMeteoroid &problem) override;
 
     // IResultFormatter member
     virtual real Store(real t, real m, real v, real h, real l, real gamma) override;
@@ -148,10 +149,10 @@ class MetaFormatter : public IResultFormatter
 
     // Extracts N best cases that were reported to this formatter
     // Resets the internal ratings
-    void ExportAndReset(std::vector<std::pair<Case, double> > &results);
+    void ExportAndReset(std::vector<std::pair<VirtualMeteoroid, double> > &results);
 
   private:
     size_t n_best_, buffer_size_;
     double accuracy_threshold_;
-    std::vector<std::pair<Case, double> > problems_;
+    std::vector<std::pair<VirtualMeteoroid, double> > problems_;
 };

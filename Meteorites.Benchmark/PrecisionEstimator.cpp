@@ -76,7 +76,7 @@ real ToDegrees(real rads)
 
 } // unnamed namespace
 
-void PrecisionEstimator::CompareMethods(const Case &problem, real dt, std::ostream &str)
+void PrecisionEstimator::CompareMethods(const VirtualMeteoroid &problem, real dt, std::ostream &str)
 {
   assert(dt <= 1e-1f);
 
@@ -130,7 +130,7 @@ void PrecisionEstimator::CompareMethods(const Case &problem, real dt, std::ostre
   }
 }
 
-void PrecisionEstimator::CompareSteps(const Case &problem,
+void PrecisionEstimator::CompareSteps(const VirtualMeteoroid &problem,
                                       NumericalAlgorithm method,
                                       std::ostream &str)
 {
@@ -179,7 +179,7 @@ void PrecisionEstimator::CompareSteps(const Case &problem,
   }
 }
 
-void PrecisionEstimator::ComparePerturbations(const Case &p,
+void PrecisionEstimator::ComparePerturbations(const VirtualMeteoroid &p,
                                               NumericalAlgorithm method,
                                               real dt, std::ostream &str)
 {
@@ -201,8 +201,8 @@ void PrecisionEstimator::ComparePerturbations(const Case &p,
     {
       auto new_params = params;
       new_params[i] += new_params[i] * peturbations[j];
-      Case problem(new_params[0], new_params[1], new_params[2], new_params[3], new_params[4],
-                   new_params[5], new_params[6], new_params[7], new_params[8]);
+      VirtualMeteoroid problem(new_params[0], new_params[1], new_params[2], new_params[3], new_params[4],
+                               new_params[5], new_params[6], new_params[7], new_params[8]);
       solver.Solve(problem, f, fmt);
     }
   }

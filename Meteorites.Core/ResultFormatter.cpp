@@ -48,7 +48,7 @@ CsvFromatter::~CsvFromatter()
   { file_.close(); }
 }
 
-real CsvFromatter::Started(const Case &problem)
+real CsvFromatter::Started(const VirtualMeteoroid &problem)
 {
   assert(!file_.is_open());
   auto name = FormatCsvName(id_, cur_);
@@ -133,7 +133,7 @@ BufferingFormatter::BufferingFormatter(real dt)
   { throw std::runtime_error("'dt' must be declared as positive number or zero"); }
 }
 
-real BufferingFormatter::Started(const Case &problem)
+real BufferingFormatter::Started(const VirtualMeteoroid &problem)
 {
   t_next_   = (real)0.0;
   logs_.emplace_back(Log(problem));
@@ -175,7 +175,7 @@ MetaFormatter::MetaFormatter(size_t n_best, size_t buffer_size)
   { throw std::runtime_error("'buffer_size' must be greater than 'n_best'"); }
 }
 
-real MetaFormatter::Started(const Case &problem)
+real MetaFormatter::Started(const VirtualMeteoroid &problem)
 {
   problems_.emplace_back(std::make_pair(problem, std::numeric_limits<double>::max()));
   return std::numeric_limits<real>::max();
@@ -189,11 +189,11 @@ real MetaFormatter::Store(real, real, real, real, real, real)
 namespace
 {
 
-void SelectBest(std::vector<std::pair<Case, double> > &problems, size_t n_best)
+void SelectBest(std::vector<std::pair<VirtualMeteoroid, double> > &problems, size_t n_best)
 {
   std::sort(problems.begin(), problems.end(),
-            [](const std::pair<Case, double> &el1,
-                const std::pair<Case, double> &el2) -> bool
+            [](const std::pair<VirtualMeteoroid, double> &el1,
+               const std::pair<VirtualMeteoroid, double> &el2) -> bool
             {
               return el1.second < el2.second;
             });
@@ -225,7 +225,7 @@ void MetaFormatter::Finished(Reason reason, double accuracy)
   }
 }
 
-void MetaFormatter::ExportAndReset(std::vector<std::pair<Case, double> > &results)
+void MetaFormatter::ExportAndReset(std::vector<std::pair<VirtualMeteoroid, double> > &results)
 {
   if (problems_.size() >= n_best_)
   { SelectBest(problems_, n_best_); }
