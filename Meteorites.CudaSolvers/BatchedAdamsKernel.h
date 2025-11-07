@@ -1,5 +1,5 @@
 #pragma once
-#include "Meteorites.GpuSolvers/CudaDefs.h"
+#include "Meteorites.CudaSolvers/CudaDefs.h"
 
 #include "Meteorites.Core/Adams.h"
 #include "Meteorites.Core/Meteoroids/VirtualMeteoroid.h"

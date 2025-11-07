@@ -12,7 +12,7 @@
 #include "Meteorites.KnowledgeBase/MonteCarloGenerator.h"
 
 #if defined(METEORITES_CUDA)
-  #include "Meteorites.GpuSolvers/CudaSolver.h"
+  #include "Meteorites.CudaSolvers/PedanticCudaSolver.h"
 #endif
 
 
@@ -97,7 +97,7 @@ int main()
       std::unique_ptr<ISolver> solver;
     #if defined(METEORITES_CUDA)
       if constexpr (USE_GPU)
-      { solver.reset(new CudaSolver()); }
+      { solver.reset(new PedanticCudaSolver()); }
       else
     #endif
       { solver.reset(new GoldSolver()); }

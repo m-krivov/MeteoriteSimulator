@@ -1,4 +1,4 @@
-#include "CudaSolver.h"
+#include "PedanticCudaSolver.h"
 
 #include "BatchedAdamsKernel.h"
 
@@ -166,7 +166,7 @@ void BatchedAdams(const std::vector<VirtualMeteoroid> &problems, real dt, real t
 //--- CudaSolver ---
 //------------------
 
-CudaSolver::CudaSolver(CudaSolverConfig config)
+PedanticCudaSolver::PedanticCudaSolver(PedanticCudaSolverConfig config)
   : config_(config)
 {
   int device = 0;
@@ -180,7 +180,7 @@ CudaSolver::CudaSolver(CudaSolverConfig config)
   HANDLE_ERROR(CudaAlloc(buffer_records_,  batch_size * config_.iterations_per_block * sizeof(Record)));
 }
 
-CudaSolver::~CudaSolver()
+PedanticCudaSolver::~PedanticCudaSolver()
 {
   try
   {
@@ -197,12 +197,14 @@ CudaSolver::~CudaSolver()
   }
 }
 
-size_t CudaSolver::BatchSize() const
+size_t PedanticCudaSolver::BatchSize() const
 {
   return config_.threads_per_block * config_.blocks_per_sm * props_.multiProcessorCount;
 }
 
-void CudaSolver::Solve(IMeteoroidGenerator &generator, const IFunctional &functional, IResultFormatter &results)
+void PedanticCudaSolver::Solve(IMeteoroidGenerator &generator,
+                               const IFunctional &functional,
+                               IResultFormatter &results)
 {
   std::vector<VirtualMeteoroid> problems;
   size_t batch_size = BatchSize();
@@ -220,7 +222,9 @@ void CudaSolver::Solve(IMeteoroidGenerator &generator, const IFunctional &functi
   while (!problems.empty());
 }
 
-void CudaSolver::Solve(const std::vector<VirtualMeteoroid> &problems, const IFunctional &functional, IResultFormatter &results)
+void PedanticCudaSolver::Solve(const std::vector<VirtualMeteoroid> &problems,
+                               const IFunctional &functional,
+                               IResultFormatter &results)
 {
   // Resize buffers for functional arguments and timestamps (if needed)
   size_t n_timestamps{};
@@ -268,7 +272,9 @@ void CudaSolver::Solve(const std::vector<VirtualMeteoroid> &problems, const IFun
   }
 }
 
-void CudaSolver::Solve(const VirtualMeteoroid &problem, const IFunctional &functional, IResultFormatter &results)
+void PedanticCudaSolver::Solve(const VirtualMeteoroid &problem,
+                               const IFunctional &functional,
+                               IResultFormatter &results)
 {
   std::vector<VirtualMeteoroid> problems = { problem };
   Solve(problems, functional, results);
