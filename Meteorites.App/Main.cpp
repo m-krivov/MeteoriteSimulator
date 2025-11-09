@@ -56,12 +56,19 @@ int main()
 {
   using clock = std::chrono::high_resolution_clock;
 
-  decltype(auto) meteorite = KnownMeteorites::Get(METEORITE);
+  decltype(auto) meteorite = KnownMeteorites::Ref().Get(METEORITE);
   decltype(auto) params    = PossibleParameters::Get(PARAMETERS);
   auto progress_callback = [](float) -> void {
     std::cout << '#';
     std::cout.flush();
   };
+
+  // Print all available information about the simulated meteorite
+  std::cout << "Meteorite: " << meteorite.Name() << std::endl;
+  std::cout << "     Date: " << meteorite.Date() << std::endl;
+  std::cout << "     Fall: " << meteorite.FallLocation() << std::endl;
+  std::cout << "     DOI:  " << meteorite.DOI() << std::endl;
+  std::cout << std::endl;
 
   // For the first stage, we don't want to simulate meteorite flight till the end
   // So we may use the last record as timeout
@@ -69,7 +76,7 @@ int main()
   {
     size_t records;
     const real *time, *v, *h;
-    meteorite->Trajectory(records, time, v, h);
+    meteorite.Trajectory(records, time, v, h);
     t_end = time[records - 1];
   }
 
@@ -85,13 +92,13 @@ int main()
     std::cout << "     dt:         " << STAGE1_DT << " seconds" << std::endl;
     std::vector<std::pair<VirtualMeteoroid, double> > good_meteoroids;
     {
-      MonteCarloGenerator generator(*meteorite, params, STAGE1_N_TOTAL, SEED);
+      MonteCarloGenerator generator(meteorite, params, STAGE1_N_TOTAL, SEED);
       generator.OnProgress
       (
         [bar = std::make_shared<MyProgressBar>()](float progress) mutable -> void
         { bar->set_progress((size_t)(100 * progress)); }, 0.01f
       );
-      L2Functional functional(*meteorite);
+      L2Functional functional(meteorite);
       MetaFormatter meta_fmt(STAGE1_N_TOP, STAGE1_N_TOP * 10);
 
       std::unique_ptr<ISolver> solver;
@@ -121,8 +128,8 @@ int main()
       GoldSolver solver;
       solver.Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
 
-      L2Functional functional(*meteorite);
-      CsvFromatter csv_fmt(meteorite->Name(), 0.01f);
+      L2Functional functional(meteorite);
+      CsvFromatter csv_fmt(meteorite.Name(), 0.01f);
       CollectionMeteoroidGenerator generator(good_meteoroids);
       generator.OnProgress
       (
