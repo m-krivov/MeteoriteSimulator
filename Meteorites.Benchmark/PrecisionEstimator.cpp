@@ -1,5 +1,6 @@
 #include "PrecisionEstimator.h"
 
+#include "Meteorites.Core/Functionals/FakeFunctional.h"
 #include "Meteorites.Core/ResultFormatters.h"
 
 namespace

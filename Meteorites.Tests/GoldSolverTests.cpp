@@ -1,5 +1,6 @@
 #include "TestDefs.h"
 
+#include "Meteorites.Core/Functionals/FakeFunctional.h"
 #include "Meteorites.CpuSolvers/GoldSolver.h"
 
 constexpr real dt_sim = (real)1e-3;

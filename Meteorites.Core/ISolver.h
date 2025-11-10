@@ -1,7 +1,7 @@
 #pragma once
 #include "Defs.h"
 
-#include "Meteorites.Core/Functionals.h"
+#include "Meteorites.Core/Functionals/IFunctional.h"
 #include "Meteorites.Core/Meteoroids/IMeteoroidGenerator.h"
 #include "Meteorites.Core/ResultFormatters.h"
 

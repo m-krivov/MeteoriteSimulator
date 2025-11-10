@@ -3,7 +3,9 @@
 #include <indicators/cursor_control.hpp>
 #include <indicators/progress_bar.hpp>
 
-#include "Meteorites.Core/Functionals.h"
+#include "Meteorites.Core/Functionals/CFunctional.h"
+#include "Meteorites.Core/Functionals/L1Functional.h"
+#include "Meteorites.Core/Functionals/L2Functional.h"
 #include "Meteorites.Core/ResultFormatters.h"
 #include "Meteorites.Core/Meteoroids/CollectionMeteoroidGenerator.h"
 #include "Meteorites.CpuSolvers/GoldSolver.h"
@@ -25,9 +27,11 @@ constexpr size_t STAGE1_N_TOTAL  = 1000000;
 constexpr size_t STAGE1_N_TOP    = 100;
 constexpr auto   STAGE1_METHOD   = NumericalAlgorithm::TWO_STEP_ADAMS;
 constexpr real   STAGE1_DT       = (real)1e-3;
+using            STAGE1_FUNC     = L2Functional;
 
 constexpr auto   STAGE2_METHOD   = NumericalAlgorithm::THREE_STEP_ADAMS;
 constexpr real   STAGE2_DT       = (real)1e-4;
+using            STAGE2_FUNC     = L2Functional;
 
 #if defined(METEORITES_CUDA)
   constexpr bool   USE_GPU = true;
@@ -98,7 +102,7 @@ int main()
         [bar = std::make_shared<MyProgressBar>()](float progress) mutable -> void
         { bar->set_progress((size_t)(100 * progress)); }, 0.01f
       );
-      L2Functional functional(meteorite);
+      STAGE1_FUNC functional(meteorite);
       MetaFormatter meta_fmt(STAGE1_N_TOP, STAGE1_N_TOP * 10);
 
       std::unique_ptr<ISolver> solver;
@@ -128,7 +132,7 @@ int main()
       GoldSolver solver;
       solver.Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
 
-      L2Functional functional(meteorite);
+      STAGE2_FUNC functional(meteorite);
       CsvFromatter csv_fmt(meteorite.Name(), 0.01f);
       CollectionMeteoroidGenerator generator(good_meteoroids);
       generator.OnProgress
