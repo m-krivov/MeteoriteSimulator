@@ -67,7 +67,7 @@ class Enumerator
 // Expects that all buffers points to device-accessible memory and have valid sizes
 template <uint32_t STEPS>
 void BatchedAdams(const std::vector<VirtualMeteoroid> &problems, real dt, real timeout,
-                  const IFunctional &functional, IResultFormatter &results,
+                  const IFunctional &functional, ISimulationRecorder &results,
 
                   size_t batch_size, size_t iterations_per_batch, size_t threads_per_block,
 
@@ -154,7 +154,7 @@ void BatchedAdams(const std::vector<VirtualMeteoroid> &problems, real dt, real t
 
       // Finalize the meteorite
       // We can continue using 'record' as it is still valid
-      results.Finished(IResultFormatter::Classify(record->t, record->M, record->h), f_val);
+      results.Finished(ISimulationRecorder::Classify(record->t, record->M, record->h), f_val);
     }
   }
 }
@@ -204,7 +204,7 @@ size_t PedanticCudaSolver::BatchSize() const
 
 void PedanticCudaSolver::Solve(IMeteoroidGenerator &generator,
                                const IFunctional &functional,
-                               IResultFormatter &results)
+                               ISimulationRecorder &results)
 {
   std::vector<VirtualMeteoroid> problems;
   size_t batch_size = BatchSize();
@@ -224,7 +224,7 @@ void PedanticCudaSolver::Solve(IMeteoroidGenerator &generator,
 
 void PedanticCudaSolver::Solve(const std::vector<VirtualMeteoroid> &problems,
                                const IFunctional &functional,
-                               IResultFormatter &results)
+                               ISimulationRecorder &results)
 {
   // Resize buffers for functional arguments and timestamps (if needed)
   size_t n_timestamps{};
@@ -274,7 +274,7 @@ void PedanticCudaSolver::Solve(const std::vector<VirtualMeteoroid> &problems,
 
 void PedanticCudaSolver::Solve(const VirtualMeteoroid &problem,
                                const IFunctional &functional,
-                               IResultFormatter &results)
+                               ISimulationRecorder &results)
 {
   std::vector<VirtualMeteoroid> problems = { problem };
   Solve(problems, functional, results);

@@ -1,6 +1,7 @@
 #include "TestDefs.h"
 
 #include "Meteorites.Core/Functionals/FakeFunctional.h"
+#include "Meteorites.Core/Recorders/BufferingRecorder.h"
 #include "Meteorites.CpuSolvers/GoldSolver.h"
 
 constexpr real dt_sim = (real)1e-3;
@@ -9,8 +10,8 @@ class GoldTests : public testing::Test
 {
   protected:
     template <size_t N>
-    static void ExtractLogPtrs(const BufferingFormatter &fmt,
-                               std::array<const BufferingFormatter::Log *, N> &res)
+    static void ExtractLogPtrs(const BufferingRecorder &fmt,
+                               std::array<const BufferingRecorder::Log *, N> &res)
     {
       decltype(auto) logs = fmt.Logs();
       ASSERT_EQ(logs.size(), N);
@@ -19,15 +20,15 @@ class GoldTests : public testing::Test
       {
         decltype(auto) log = logs[i];
         ASSERT_FALSE(log.records.empty());
-        ASSERT_TRUE(log.reason != IResultFormatter::Reason::NA);
+        ASSERT_TRUE(log.reason != ISimulationRecorder::Reason::NA);
         res[i] = &log;
       }
     }
 
     template <size_t N>
-    static auto ExtractLogPtrs(const BufferingFormatter &fmt) -> decltype(auto)
+    static auto ExtractLogPtrs(const BufferingRecorder &fmt) -> decltype(auto)
     {
-      std::array<const BufferingFormatter::Log *, N> res;
+      std::array<const BufferingRecorder::Log *, N> res;
       ExtractLogPtrs(fmt, res);
       return res;
     }
@@ -48,7 +49,7 @@ TEST_F(GoldTests, Vacuum_VerticalSpeed)
   VirtualMeteoroid problem(1.0f, 0.0f, 2000.0f, 0.0f, 0.0f,
                            1.0f, 0.5f, 1000.0f, (real)M_PI / 2);
   FakeFunctional f;
-  BufferingFormatter fmt(0.1f);
+  BufferingRecorder fmt(0.1f);
 
   solver.Solve(problem, f, fmt);
 
@@ -72,7 +73,7 @@ TEST_F(GoldTests, Vacuum_HorizontalSpeed)
   VirtualMeteoroid problem(1.0f, 0.0f, 2000.0f, 0.0f, 0.0f,
                            1.0f, 2.5f, 500.0f, 0.0f);
   FakeFunctional f;
-  BufferingFormatter fmt(0.1f);
+  BufferingRecorder fmt(0.1f);
 
   solver.Solve(problem, f, fmt);
   decltype(auto) log = ExtractLogPtrs<1>(fmt)[0];
@@ -95,7 +96,7 @@ TEST_F(GoldTests, Atmosphere_BrakingForce)
   GoldSolver solver;
   solver.Configure(NumericalAlgorithm::ONE_STEP_ADAMS, dt_sim, 3600.0f);
   FakeFunctional f;
-  BufferingFormatter fmt(0.0f);
+  BufferingRecorder fmt(0.0f);
 
   for (auto Cd : { 0.0f, 0.5f, 1.0f, 1.5f, 2.0f })
   {
@@ -139,7 +140,7 @@ TEST_F(GoldTests, Atmosphere_LiftingForce)
   GoldSolver solver;
   solver.Configure(NumericalAlgorithm::ONE_STEP_ADAMS, dt_sim, 3600.0f);
   FakeFunctional f;
-  BufferingFormatter fmt(0.0f);
+  BufferingRecorder fmt(0.0f);
 
   for (auto Cl : { 0.0f, 0.05f, 0.1f, 0.15f })
   {
@@ -151,8 +152,8 @@ TEST_F(GoldTests, Atmosphere_LiftingForce)
   decltype(auto) logs = ExtractLogPtrs<4>(fmt);
   for (size_t i = 0; i < logs.size() - 1; i++)
   {
-    ASSERT_TRUE(logs[i]->reason     == IResultFormatter::Reason::Collided);
-    ASSERT_TRUE(logs[i + 1]->reason == IResultFormatter::Reason::Collided);
+    ASSERT_TRUE(logs[i]->reason     == ISimulationRecorder::Reason::Collided);
+    ASSERT_TRUE(logs[i + 1]->reason == ISimulationRecorder::Reason::Collided);
 
 
     ASSERT_TRUE(logs[i]->records.size() > 1000);
@@ -169,7 +170,7 @@ TEST_F(GoldTests, Atmosphere_HeatExchange)
   GoldSolver solver;
   solver.Configure(NumericalAlgorithm::ONE_STEP_ADAMS, dt_sim, 3600.0f);
   FakeFunctional f;
-  BufferingFormatter fmt(0.0f);
+  BufferingRecorder fmt(0.0f);
 
   for (auto coeffs : { std::make_pair(1e6f, 0.3f),
                         std::make_pair(2e6f, 0.2f),
@@ -213,7 +214,7 @@ TEST_F(GoldTests, Method_TwoThreeSteps)
                                          5.0f, 10e3f, 55e3f, (real)M_PI / 9));
   for (auto &problem : problems)
   {
-    BufferingFormatter fmt(0.01f);
+    BufferingRecorder fmt(0.01f);
     for (auto solver : { &one_step, &two_step, &three_step })
     { solver->Solve(problem, f, fmt); }
     auto logs = ExtractLogPtrs<3>(fmt);
@@ -245,7 +246,7 @@ TEST_F(GoldTests, Method_Precision)
   VirtualMeteoroid problem(0.5e6f, 0.1f, 4000.0f, 1.0f, 0.01f,
                            25.0f, 5e3f, 30e3f, (real)M_PI / 4);
   FakeFunctional f;
-  BufferingFormatter fmt(0.01f);
+  BufferingRecorder fmt(0.01f);
   for (auto dt : { 1e-3f, 1e-4f, 1e-5f })
   {
     solver.Configure(NumericalAlgorithm::ONE_STEP_ADAMS, dt, 3600.0f);

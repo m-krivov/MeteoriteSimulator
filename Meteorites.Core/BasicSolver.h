@@ -12,12 +12,12 @@ class BasicSolver : public ISolver
     // ISolver method
     virtual void Solve(const std::vector<VirtualMeteoroid> &problems,
                        const IFunctional &functional,
-                       IResultFormatter &results) override;
+                       ISimulationRecorder &results) override;
 
     // ISolver method
     virtual void Solve(IMeteoroidGenerator &generator,
                        const IFunctional &functional,
-                       IResultFormatter &results) override;
+                       ISimulationRecorder &results) override;
 
   protected:
     BasicSolver() = default;

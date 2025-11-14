@@ -8,7 +8,7 @@ namespace
 // An unified implementation for one-step, two-step and three-step Adams method
 template <unsigned int STEPS>
 void AdamsMethod(const VirtualMeteoroid &problem, const IFunctional &functional, real dt, real timeout,
-                 IResultFormatter &results)
+                 ISimulationRecorder &results)
 {
   assert(1u <= STEPS && STEPS <= 3u);   // not adapted for other steps
   assert(problem.M0 > (real)0.0);
@@ -82,27 +82,27 @@ void AdamsMethod(const VirtualMeteoroid &problem, const IFunctional &functional,
     // Check, should we stop the simulation?
     if (M <= (real)0.01)
     {
-      results.Finished(IResultFormatter::Reason::Burnt,
+      results.Finished(ISimulationRecorder::Reason::Burnt,
                        functional.Compute(timestamp, &V_arg[0], &h_arg[0]));
       return;
     }
     if (h <= (real)0.0)
     {
-      results.Finished(IResultFormatter::Reason::Collided,
+      results.Finished(ISimulationRecorder::Reason::Collided,
                        functional.Compute(timestamp, &V_arg[0], &h_arg[0]));
       return;
     }
   }
 
   // Looks like something goes wrong
-  results.Finished(IResultFormatter::Reason::Timeouted,
+  results.Finished(ISimulationRecorder::Reason::Timeouted,
                    functional.Compute(timestamp, &V_arg[0], &h_arg[0]));
 }
 
 } // unnamed namespace
 
 
-void GoldSolver::Solve(const VirtualMeteoroid &problem, const IFunctional &functional, IResultFormatter &results)
+void GoldSolver::Solve(const VirtualMeteoroid &problem, const IFunctional &functional, ISimulationRecorder &results)
 {
   switch (Algorithm())
   {

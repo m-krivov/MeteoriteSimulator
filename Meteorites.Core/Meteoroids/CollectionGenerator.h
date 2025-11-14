@@ -6,19 +6,19 @@
 // Represents a C++ container as a generator of meteoroids
 // The 'CONTAINER' type must provide 'begin()' + 'end()' iterators and the 'size()' method
 template <typename CONTAINER = std::vector<VirtualMeteoroid>>
-class CollectionMeteoroidGenerator : public BasicMeteoroidGenerator
+class CollectionGenerator : public BasicMeteoroidGenerator
 {
   public:
-    CollectionMeteoroidGenerator() = delete;
-    CollectionMeteoroidGenerator(const CollectionMeteoroidGenerator &) = delete;
-    CollectionMeteoroidGenerator &operator =(const CollectionMeteoroidGenerator &) = delete;
+    CollectionGenerator() = delete;
+    CollectionGenerator(const CollectionGenerator &) = delete;
+    CollectionGenerator &operator =(const CollectionGenerator &) = delete;
 
-    CollectionMeteoroidGenerator(CONTAINER &&meteoroids)
+    CollectionGenerator(CONTAINER &&meteoroids)
       : meteoroids_(std::move(meteoroids)), current_(meteoroids_.begin())
     {}
 
     // Version suitable for 'MetaFormatter'
-    CollectionMeteoroidGenerator(const std::vector<std::pair<VirtualMeteoroid, double>> &meteoroids)
+    CollectionGenerator(const std::vector<std::pair<VirtualMeteoroid, double>> &meteoroids)
     {
       meteoroids_.reserve(meteoroids.size());
       for (const auto &[meteoroid, loss] : meteoroids)

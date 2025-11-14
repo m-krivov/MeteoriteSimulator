@@ -6,12 +6,13 @@
 #include "Meteorites.Core/Functionals/CFunctional.h"
 #include "Meteorites.Core/Functionals/L1Functional.h"
 #include "Meteorites.Core/Functionals/L2Functional.h"
-#include "Meteorites.Core/ResultFormatters.h"
-#include "Meteorites.Core/Meteoroids/CollectionMeteoroidGenerator.h"
+#include "Meteorites.Core/Recorders/CsvRecorder.h"
+#include "Meteorites.Core/Recorders/MetaRecorder.h"
+#include "Meteorites.Core/Meteoroids/CollectionGenerator.h"
+#include "Meteorites.Core/Meteoroids/MonteCarloGenerator.h"
 #include "Meteorites.CpuSolvers/GoldSolver.h"
 #include "Meteorites.KnowledgeBase/KnownMeteorites.h"
 #include "Meteorites.KnowledgeBase/PossibleParameters.h"
-#include "Meteorites.KnowledgeBase/MonteCarloGenerator.h"
 
 #if defined(METEORITES_CUDA)
   #include "Meteorites.CudaSolvers/PedanticCudaSolver.h"
@@ -103,7 +104,7 @@ int main()
         { bar->set_progress((size_t)(100 * progress)); }, 0.01f
       );
       STAGE1_FUNC functional(meteorite);
-      MetaFormatter meta_fmt(STAGE1_N_TOP, STAGE1_N_TOP * 10);
+      MetaRecorder meta_fmt(STAGE1_N_TOP, STAGE1_N_TOP * 10);
 
       std::unique_ptr<ISolver> solver;
     #if defined(METEORITES_CUDA)
@@ -133,8 +134,8 @@ int main()
       solver.Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
 
       STAGE2_FUNC functional(meteorite);
-      CsvFromatter csv_fmt(meteorite.Name(), 0.01f);
-      CollectionMeteoroidGenerator generator(good_meteoroids);
+      CsvRecorder csv_fmt(meteorite.Name(), 0.01f);
+      CollectionGenerator generator(good_meteoroids);
       generator.OnProgress
       (
         [bar = std::make_shared<MyProgressBar>()](float progress) mutable -> void

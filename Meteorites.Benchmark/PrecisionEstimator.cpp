@@ -1,7 +1,7 @@
 #include "PrecisionEstimator.h"
 
 #include "Meteorites.Core/Functionals/FakeFunctional.h"
-#include "Meteorites.Core/ResultFormatters.h"
+#include "Meteorites.Core/Recorders/BufferingRecorder.h"
 
 namespace
 {
@@ -24,7 +24,7 @@ std::string ToString(double value)
 }
 
 // For each log, determines the number of record that corresponds to normalized 'time'
-std::vector<size_t> GetTimePoints(const std::vector<BufferingFormatter::Log> &logs, real time)
+std::vector<size_t> GetTimePoints(const std::vector<BufferingRecorder::Log> &logs, real time)
 {
   auto t_end = std::numeric_limits<real>::max();
   for (const auto &log : logs)
@@ -83,7 +83,7 @@ void PrecisionEstimator::CompareMethods(const VirtualMeteoroid &problem, real dt
 
   // Prepare data that we want to analyze
   GoldSolver solver;
-  BufferingFormatter fmt(0.0f);
+  BufferingRecorder fmt(0.0f);
   FakeFunctional f;
 
   solver.Configure(NumericalAlgorithm::ONE_STEP_ADAMS, dt, TIMEOUT);
@@ -141,7 +141,7 @@ void PrecisionEstimator::CompareSteps(const VirtualMeteoroid &problem,
   std::array<real, 6> steps{ (real)1e-1, (real)1e-2, (real)1e-3,
                              (real)1e-4, (real)1e-5, (real)1e-6 };
 
-  BufferingFormatter fmt((real)0.0);
+  BufferingRecorder fmt((real)0.0);
   for (real dt : steps)
   {
     solver.Configure(method, dt, TIMEOUT);
@@ -195,7 +195,7 @@ void PrecisionEstimator::ComparePerturbations(const VirtualMeteoroid &p,
   std::array<std::string, 9> names{ "H", "Ch", "Rho", "Cd", "Cl",
                                     "M0", "V0", "h0", "Gamma0" };
 
-  BufferingFormatter fmt(dt);
+  BufferingRecorder fmt(dt);
   for (size_t i = 0; i < params.size(); i++)
   {
     for (size_t j = 0; j < peturbations.size(); j++)

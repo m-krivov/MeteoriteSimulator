@@ -3,7 +3,7 @@
 
 #include "Meteorites.Core/ParameterSet.h"
 #include "Meteorites.Core/IMeteorite.h"
-#include "Meteorites.Core/Meteoroids/BasicMeteoroidGenerator.h"
+#include "BasicMeteoroidGenerator.h"
 
 // Generates the required number of random meteoroids using the Monte-Carlo method
 class MonteCarloGenerator : public BasicMeteoroidGenerator

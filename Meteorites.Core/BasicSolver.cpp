@@ -34,7 +34,7 @@ void BasicSolver::Configure(NumericalAlgorithm alg, real dt, real timeout)
 
 void BasicSolver::Solve(const std::vector<VirtualMeteoroid> &problems,
                         const IFunctional &functional,
-                        IResultFormatter &results)
+                        ISimulationRecorder &results)
 {
   for (const auto &problem : problems)
   { ((ISolver *)this)->Solve(problem, functional, results); }
@@ -42,7 +42,7 @@ void BasicSolver::Solve(const std::vector<VirtualMeteoroid> &problems,
 
 void BasicSolver::Solve(IMeteoroidGenerator &generator,
                         const IFunctional &functional,
-                        IResultFormatter &results)
+                        ISimulationRecorder &results)
 {
   VirtualMeteoroid problem;
   while (generator.MoveNext())

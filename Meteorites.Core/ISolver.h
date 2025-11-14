@@ -3,7 +3,7 @@
 
 #include "Meteorites.Core/Functionals/IFunctional.h"
 #include "Meteorites.Core/Meteoroids/IMeteoroidGenerator.h"
-#include "Meteorites.Core/ResultFormatters.h"
+#include "Meteorites.Core/Recorders/ISimulationRecorder.h"
 
 // The known numerical methods that may be used to solve ODEs
 enum class NumericalAlgorithm : uint32_t
@@ -30,19 +30,19 @@ class ISolver
     // Solves a single problem, computes functional value and sends solution to formatter
     virtual void Solve(const VirtualMeteoroid &problem,
                        const IFunctional &functional,
-                       IResultFormatter &results) = 0;
+                       ISimulationRecorder &results) = 0;
 
     // Finds solutions for the fixed-size set of problems
     // This version may be parallelized
     virtual void Solve(const std::vector<VirtualMeteoroid> &problems,
                        const IFunctional &functional,
-                       IResultFormatter &results) = 0;
+                       ISimulationRecorder &results) = 0;
 
     // Finds solutions for the problems represented by a stream
     // This version may be parallelized
     virtual void Solve(IMeteoroidGenerator &generator,
                        const IFunctional &functional,
-                       IResultFormatter &results) = 0;
+                       ISimulationRecorder &results) = 0;
 
   protected:
     ISolver() = default;

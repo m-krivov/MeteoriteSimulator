@@ -34,17 +34,17 @@ class PedanticCudaSolver : public BasicSolver
     // ISolver method
     virtual void Solve(const VirtualMeteoroid &problem,
                        const IFunctional &functional,
-                       IResultFormatter &results) override final;
+                       ISimulationRecorder &results) override final;
 
     // ISolver method
     virtual void Solve(const std::vector<VirtualMeteoroid> &problems,
                        const IFunctional &functional,
-                       IResultFormatter &results) override final;
+                       ISimulationRecorder &results) override final;
 
     // ISolver method
     virtual void Solve(IMeteoroidGenerator &generator,
                        const IFunctional &functional,
-                       IResultFormatter &results) override final;
+                       ISimulationRecorder &results) override final;
   private:
     // How many meteorites must be simulated at one time
     size_t BatchSize() const;
