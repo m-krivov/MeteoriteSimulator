@@ -11,16 +11,16 @@ class GoldTests : public testing::Test
   protected:
     template <size_t N>
     static void ExtractLogPtrs(const BufferingRecorder &fmt,
-                               std::array<const BufferingRecorder::Log *, N> &res)
+                               std::array<const MeteoroidTrajectory *, N> &res)
     {
-      decltype(auto) logs = fmt.Logs();
+      decltype(auto) logs = fmt.Trajectories();
       ASSERT_EQ(logs.size(), N);
 
       for (size_t i = 0; i < N; i++)
       {
         decltype(auto) log = logs[i];
-        ASSERT_FALSE(log.records.empty());
-        ASSERT_TRUE(log.reason != ISimulationRecorder::Reason::NA);
+        ASSERT_FALSE(log.Records().empty());
+        ASSERT_TRUE(log.Reason() != ISimulationRecorder::Reason::NA);
         res[i] = &log;
       }
     }
@@ -28,7 +28,7 @@ class GoldTests : public testing::Test
     template <size_t N>
     static auto ExtractLogPtrs(const BufferingRecorder &fmt) -> decltype(auto)
     {
-      std::array<const BufferingRecorder::Log *, N> res;
+      std::array<const MeteoroidTrajectory *, N> res;
       ExtractLogPtrs(fmt, res);
       return res;
     }
@@ -54,7 +54,7 @@ TEST_F(GoldTests, Vacuum_VerticalSpeed)
   solver.Solve(problem, f, fmt);
 
   decltype(auto) log = ExtractLogPtrs<1>(fmt)[0];
-  decltype(auto) last_record = log->records[log->records.size() - 1];
+  decltype(auto) last_record = log->LastRecord();
       
   ASSERT_TRUE(std::abs(last_record.M - problem.M0) < (real)1e-3);
   constexpr auto a = -Constants::g() / 2.0;
@@ -77,7 +77,7 @@ TEST_F(GoldTests, Vacuum_HorizontalSpeed)
 
   solver.Solve(problem, f, fmt);
   decltype(auto) log = ExtractLogPtrs<1>(fmt)[0];
-  decltype(auto) last_record = log->records[log->records.size() - 1];
+  decltype(auto) last_record = log->LastRecord();
 
   ASSERT_TRUE(std::abs(last_record.M - problem.M0) < (real)1e-3);
   constexpr auto a = -Constants::g() / 2.0f;
@@ -109,7 +109,7 @@ TEST_F(GoldTests, Atmosphere_BrakingForce)
   std::array<std::pair<real, real>, 5> peaks;
   for (size_t i = 0; i < logs.size(); i++)
   {
-    decltype(auto) records = logs[i]->records;
+    decltype(auto) records = logs[i]->Records();
     auto peak = std::make_pair(records[0].h, records[0].t);
     bool peak_reached = false;
     for (size_t j = 1; j < records.size(); j++)
@@ -152,15 +152,15 @@ TEST_F(GoldTests, Atmosphere_LiftingForce)
   decltype(auto) logs = ExtractLogPtrs<4>(fmt);
   for (size_t i = 0; i < logs.size() - 1; i++)
   {
-    ASSERT_TRUE(logs[i]->reason     == ISimulationRecorder::Reason::Collided);
-    ASSERT_TRUE(logs[i + 1]->reason == ISimulationRecorder::Reason::Collided);
+    ASSERT_TRUE(logs[i]->Reason()     == ISimulationRecorder::Reason::Collided);
+    ASSERT_TRUE(logs[i + 1]->Reason() == ISimulationRecorder::Reason::Collided);
 
 
-    ASSERT_TRUE(logs[i]->records.size() > 1000);
-    for (size_t j = 1000; j < logs[i]->records.size(); j++)
+    ASSERT_TRUE(logs[i]->Records().size() > 1000);
+    for (size_t j = 1000; j < logs[i]->Records().size(); j++)
     {
-      if (j >= logs[i + 1]->records.size()) { break; }
-      ASSERT_TRUE(logs[i + 1]->records[j].h > logs[i]->records[j].h * 1.001f);
+      if (j >= logs[i + 1]->Records().size()) { break; }
+      ASSERT_TRUE(logs[i + 1]->Records()[j].h > logs[i]->Records()[j].h * 1.001f);
     } // for j
   } // for i
 }
@@ -184,18 +184,18 @@ TEST_F(GoldTests, Atmosphere_HeatExchange)
   decltype(auto) logs = ExtractLogPtrs<3>(fmt);
   for (size_t i = 0; i < logs.size(); i++)
   {
-    decltype(auto) records = logs[i]->records;
+    decltype(auto) records = logs[i]->Records();
     for (size_t j = 1; j < records.size(); j++)
     { ASSERT_TRUE(records[j - 1].M > records[j].M); }
   } // for i
 
-  auto n = std::min(logs[0]->records.size(), logs[1]->records.size());
-  n = std::min(n, logs[2]->records.size());
+  auto n = std::min(logs[0]->Records().size(), logs[1]->Records().size());
+  n = std::min(n, logs[2]->Records().size());
   ASSERT_TRUE(n > 1000);
   for (size_t i = 1000; i < n; i++)
   {
-    ASSERT_TRUE(logs[1]->records[i].M > logs[0]->records[i].M * 1.0001f);
-    ASSERT_TRUE(logs[2]->records[i].M > logs[1]->records[i].M * 1.0001f);
+    ASSERT_TRUE(logs[1]->Records()[i].M > logs[0]->Records()[i].M * 1.0001f);
+    ASSERT_TRUE(logs[2]->Records()[i].M > logs[1]->Records()[i].M * 1.0001f);
   }
 }
 
@@ -218,24 +218,24 @@ TEST_F(GoldTests, Method_TwoThreeSteps)
     for (auto solver : { &one_step, &two_step, &three_step })
     { solver->Solve(problem, f, fmt); }
     auto logs = ExtractLogPtrs<3>(fmt);
-    auto n = std::min(logs[0]->records.size(),
-                      logs[1]->records.size());
-    n = std::min(n, logs[2]->records.size());
+    auto n = std::min(logs[0]->Records().size(),
+                      logs[1]->Records().size());
+    n = std::min(n, logs[2]->Records().size());
 
     for (size_t i = 0; i < n; i++)
     {
-      AreAlmostEqual(logs[0]->records[i].gamma,
-                      logs[1]->records[i].gamma,
-                      logs[2]->records[i].gamma, 1e-2f);
-      AreAlmostEqual(logs[0]->records[i].h,
-                      logs[1]->records[i].h,
-                      logs[2]->records[i].h, 1e1f);
-      AreAlmostEqual(logs[0]->records[i].M,
-                      logs[1]->records[i].M,
-                      logs[2]->records[i].M, 1e-1f);
-      AreAlmostEqual(logs[0]->records[i].V,
-                      logs[1]->records[i].V,
-                      logs[2]->records[i].V, 1e1f);
+      AreAlmostEqual(logs[0]->Records()[i].gamma,
+                      logs[1]->Records()[i].gamma,
+                      logs[2]->Records()[i].gamma, 1e-2f);
+      AreAlmostEqual(logs[0]->Records()[i].h,
+                      logs[1]->Records()[i].h,
+                      logs[2]->Records()[i].h, 1e1f);
+      AreAlmostEqual(logs[0]->Records()[i].M,
+                      logs[1]->Records()[i].M,
+                      logs[2]->Records()[i].M, 1e-1f);
+      AreAlmostEqual(logs[0]->Records()[i].V,
+                      logs[1]->Records()[i].V,
+                      logs[2]->Records()[i].V, 1e1f);
     } // for j
   } // for problem
 }
@@ -254,23 +254,23 @@ TEST_F(GoldTests, Method_Precision)
   }
 
   auto logs = ExtractLogPtrs<3>(fmt);
-  auto n = std::min(logs[0]->records.size(),
-                    logs[1]->records.size());
-  n = std::min(n, logs[2]->records.size());
+  auto n = std::min(logs[0]->Records().size(),
+                    logs[1]->Records().size());
+  n = std::min(n, logs[2]->Records().size());
 
   for (size_t i = 0; i < n; i++)
   {
-    AreAlmostEqual(logs[0]->records[i].gamma,
-                    logs[1]->records[i].gamma,
-                    logs[2]->records[i].gamma, 1e-2f);
-    AreAlmostEqual(logs[0]->records[i].h,
-                    logs[1]->records[i].h,
-                    logs[2]->records[i].h, 1e1f);
-    AreAlmostEqual(logs[0]->records[i].M,
-                    logs[1]->records[i].M,
-                    logs[2]->records[i].M, 1e-1f);
-    AreAlmostEqual(logs[0]->records[i].V,
-                    logs[1]->records[i].V,
-                    logs[2]->records[i].V, 1e1f);
+    AreAlmostEqual(logs[0]->Records()[i].gamma,
+                    logs[1]->Records()[i].gamma,
+                    logs[2]->Records()[i].gamma, 1e-2f);
+    AreAlmostEqual(logs[0]->Records()[i].h,
+                    logs[1]->Records()[i].h,
+                    logs[2]->Records()[i].h, 1e1f);
+    AreAlmostEqual(logs[0]->Records()[i].M,
+                    logs[1]->Records()[i].M,
+                    logs[2]->Records()[i].M, 1e-1f);
+    AreAlmostEqual(logs[0]->Records()[i].V,
+                    logs[1]->Records()[i].V,
+                    logs[2]->Records()[i].V, 1e1f);
   } // for j
 }

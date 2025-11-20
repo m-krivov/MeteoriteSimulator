@@ -4,18 +4,21 @@
 namespace
 {
 
-std::string FormatCsvName(const std::string &id, size_t cur)
+std::string FormatCsvName(const std::filesystem::path &directory,
+                          const std::string &id, size_t cur)
 {
   std::stringstream ss;
   ss << id << "_" << cur << ".csv";
-  return ss.str();
+  return (directory / ss.str()).string();
 }
 
 } // unnamed namespace
 
-CsvRecorder::CsvRecorder(const std::string &id, real dt)
-  : dt_(dt), t_next_((real)0.0), id_(id), cur_(0)
+CsvRecorder::CsvRecorder(const std::filesystem::path &directory,
+                         const std::string &id, real dt)
+  : dt_(dt), t_next_((real)0.0), directory_(directory), id_(id), cur_(0)
 {
+  assert(std::filesystem::exists(directory));
   assert(dt >= (real)0.0);
 }
 
@@ -28,7 +31,7 @@ CsvRecorder::~CsvRecorder()
 real CsvRecorder::Started(const VirtualMeteoroid &problem)
 {
   assert(!file_.is_open());
-  auto name = FormatCsvName(id_, cur_);
+  auto name = FormatCsvName(directory_, id_, cur_);
   file_.open(name);
   if (!file_.good())
   {

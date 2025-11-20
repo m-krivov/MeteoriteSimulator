@@ -18,6 +18,9 @@
   #include "Meteorites.CudaSolvers/PedanticCudaSolver.h"
 #endif
 
+#include "Exporters/MeanStdevExporter.h"
+#include "Exporters/TrajectoryExporter.h"
+
 
 constexpr auto   METEORITE       = KnownMeteorites::ID::INNISFREE;
 constexpr auto   PARAMETERS      = Distribution::UNIFORM_ANY;
@@ -134,7 +137,7 @@ int main()
       solver.Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
 
       STAGE2_FUNC functional(meteorite);
-      CsvRecorder csv_fmt(meteorite.Name(), 0.01f);
+      CsvRecorder csv_fmt(std::filesystem::current_path(), meteorite.Name(), 0.01f);
       CollectionGenerator generator(good_meteoroids);
       generator.OnProgress
       (

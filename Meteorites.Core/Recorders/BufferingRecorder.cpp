@@ -1,36 +1,48 @@
 #include "BufferingRecorder.h"
 
-BufferingRecorder::BufferingRecorder(real dt)
-  : dt_(dt), t_next_((real)0.0)
+//---------------------------
+//--- MeteoroidTrajectory ---
+//---------------------------
+
+void MeteoroidTrajectory::ExportTo(ISimulationRecorder &recorder) const
 {
-  if (dt < (real)0.0)
-  { throw std::runtime_error("'dt' must be declared as positive number or zero"); }
+  recorder.Started(meteoroid_);
+  if (recorder.NeedTrajectory())
+  {
+    for (const auto &record : records_)
+    { recorder.Store(record.t, record.M, record.V, record.h, record.l, record.gamma); }
+  }
+  recorder.Finished(reason_, accuracy_);
 }
 
-real BufferingRecorder::Started(const VirtualMeteoroid &problem)
+//-------------------------
+//--- BufferingRecorder ---
+//-------------------------
+
+real BufferingRecorder::Started(const VirtualMeteoroid &meteoroid)
 {
+  assert((bool)current_ == false);
   t_next_   = (real)0.0;
-  logs_.emplace_back(Log(problem));
+  current_  = MeteoroidTrajectory(meteoroid);
   return t_next_;
 }
 
 real BufferingRecorder::Store(real t, real m, real v, real h, real l, real gamma)
 {
+  assert((bool)current_ == true);
   if (t >= t_next_)
   {
-    assert(!logs_.empty());
-    auto &log = logs_[logs_.size() - 1];
-    log.records.emplace_back(Record(t, m, v, h, l, gamma));
-    t_next_ += dt_;
+    current_->records_.emplace_back(MeteoroidTrajectory::Record(t, m, v, h, l, gamma));
+    t_next_ =  std::max(t_next_ + dt_, t);
   }
-
   return t_next_;
 }
 
 void BufferingRecorder::Finished(Reason reason, double accuracy)
 {
-  assert(!logs_.empty());
-  auto &log = logs_[logs_.size() - 1];
-  log.reason = reason;
-  log.accuracy = accuracy;
+  assert((bool)current_ == true);
+  current_->reason_   = reason;
+  current_->accuracy_ = accuracy;
+  trajectories_.emplace_back(std::move(current_.value()));
+  current_.reset();
 }
