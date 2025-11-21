@@ -161,7 +161,7 @@ int main()
                 [](const MeteoroidTrajectory &a, const MeteoroidTrajectory &b) -> bool
                 { return a.Accuracy() < b.Accuracy(); });
       
-      assert(STAGE2_N_TOP < stage2_trajectories.size());
+      assert(STAGE2_N_TOP <= stage2_trajectories.size());
       stage2_trajectories.erase(stage2_trajectories.begin() + STAGE2_N_TOP,
                                 stage2_trajectories.end());
     }

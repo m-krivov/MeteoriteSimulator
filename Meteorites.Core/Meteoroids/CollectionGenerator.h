@@ -29,11 +29,21 @@ class CollectionGenerator : public BasicMeteoroidGenerator
     // The member of 'IMeteoroidGenerator'
     virtual bool MoveNext() override final
     {
-      if (current_ != meteoroids_.end()) {
-        ++current_;
-        MovedNext(++counter_, meteoroids_.size());
+      if (current_ != meteoroids_.end())
+      {
+        if (!started_)
+        { started_ = true; }
+        else
+        { ++current_; }
       }
-      return current_ != meteoroids_.end();
+      
+      if (current_ != meteoroids_.end())
+      {
+        MovedNext(++counter_, meteoroids_.size());
+        return true;
+      }
+      else
+      { return false; }
     }
 
     // The member of 'IMeteoroidGenerator'
@@ -46,12 +56,14 @@ class CollectionGenerator : public BasicMeteoroidGenerator
     // The member of 'IMeteoroidGenerator'
     virtual void Reset() override final
     {
+      started_ = false;
       current_ = meteoroids_.begin();
       counter_ = 0;
     }
 
   private:
     CONTAINER meteoroids_{};
+    bool started_{false};
     typename CONTAINER::iterator current_{};
     size_t counter_{};
 };

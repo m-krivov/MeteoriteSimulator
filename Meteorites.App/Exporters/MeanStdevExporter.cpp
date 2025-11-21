@@ -74,7 +74,10 @@ void MeanStdevExporter::Export(const std::vector<MeteoroidTrajectory> &trajector
   // Split all meteoroids into subsets of different size
   std::vector<size_t> group_sizes(groups_);
   for (size_t i = 0; i < group_sizes.size(); i++)
-  { group_sizes[i] = (size_t)(trajectories.size() * ((i + 1) / (double)groups_)); }
+  {
+    group_sizes[i] = (size_t)(trajectories.size() * ((i + 1) / (double)groups_));
+    group_sizes[i] = std::max((size_t)1, group_sizes[i]);
+  }
   assert(groups_ >= 1);
   group_sizes[groups_ - 1] = trajectories.size();
 
