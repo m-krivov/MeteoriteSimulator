@@ -112,14 +112,15 @@ configure_cpp_proj(Meteorites.KnowledgeBase "meteorites.knowledge")
 
 find_cpp_sources(${ROOT_DIR}/Meteorites.App METEORITES_APP_H METEORITES_APP_CPP METEORITES_APP_CU)
 add_executable(Meteorites.App ${METEORITES_APP_H} ${METEORITES_APP_CPP} ${METEORITES_APP_CU})
+if(${METEORITES_CUDA})
+  target_link_libraries(Meteorites.App Meteorites.CudaSolvers)
+endif()
 configure_cpp_proj(Meteorites.App "meteorites"
                    Meteorites.KnowledgeBase
                    Meteorites.CpuSolvers
                    Meteorites.Core
                    indicators)
-if(${METEORITES_CUDA})
-  target_link_libraries(Meteorites.App Meteorites.CudaSolvers)
-endif()
+
 
 find_cpp_sources(${ROOT_DIR}/Meteorites.Benchmark METEORITES_BENCHMARK_H METEORITES_BENCHMARK_CPP METEORITES_BENCHMARK_CU)
 add_executable(Meteorites.Benchmark ${METEORITES_BENCHMARK_H} ${METEORITES_BENCHMARK_CPP} ${METEORITES_BENCHMARK_CU})

@@ -16,6 +16,7 @@ class KnownMeteorites
       LOST_CITY,
       INNISFREE,
       PEEKSKILL,
+      KOSICE,
       CHELYABINSK
     };
 

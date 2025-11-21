@@ -46,3 +46,8 @@ void BufferingRecorder::Finished(Reason reason, double accuracy)
   trajectories_.emplace_back(std::move(current_.value()));
   current_.reset();
 }
+
+void BufferingRecorder::MoveTo(std::vector<MeteoroidTrajectory> &trajectories)
+{
+  trajectories = std::move(trajectories_);
+}

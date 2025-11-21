@@ -1,7 +1,7 @@
 #pragma once
 #include "Meteorites.CudaSolvers/CudaDefs.h"
 
-#include "Meteorites.Core/BasicSolver.h"
+#include "Meteorites.Core/Solvers/BasicSolver.h"
 
 
 // Settings for CudaSolver

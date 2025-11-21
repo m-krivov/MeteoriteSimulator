@@ -1,8 +1,9 @@
 #pragma once
 #include "Meteorites.CudaSolvers/CudaDefs.h"
 
-#include "Meteorites.Core/Adams.h"
 #include "Meteorites.Core/Meteoroids/VirtualMeteoroid.h"
+#include "Meteorites.Core/Solvers/Adams.h"
+
 
 // Contains a few values extracted from Adams::Layer
 // They could be passed to formatters

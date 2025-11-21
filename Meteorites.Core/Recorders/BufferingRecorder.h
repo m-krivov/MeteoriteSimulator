@@ -81,6 +81,12 @@ class BufferingRecorder : public ISimulationRecorder
     // Deletes information about all recorded trajectories
     void Reset() { trajectories_.clear(); }
 
+    // Moves all recorded trajectories to the specified container
+    // Equivalent to the following code:
+    //   trajectories = recorder.Trajectories();
+    //   recorder.Reset();
+    void MoveTo(std::vector<MeteoroidTrajectory> &trajectories);
+
   private:
     real dt_{}, t_next_{};
     std::optional<MeteoroidTrajectory> current_;

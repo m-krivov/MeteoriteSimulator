@@ -1,6 +1,6 @@
 #include "GoldSolver.h"
 
-#include "Meteorites.Core/Adams.h"
+#include "Meteorites.Core/Solvers/Adams.h"
 
 namespace
 {

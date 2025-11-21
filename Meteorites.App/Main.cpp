@@ -6,7 +6,7 @@
 #include "Meteorites.Core/Functionals/CFunctional.h"
 #include "Meteorites.Core/Functionals/L1Functional.h"
 #include "Meteorites.Core/Functionals/L2Functional.h"
-#include "Meteorites.Core/Recorders/CsvRecorder.h"
+#include "Meteorites.Core/Recorders/BufferingRecorder.h"
 #include "Meteorites.Core/Recorders/MetaRecorder.h"
 #include "Meteorites.Core/Meteoroids/CollectionGenerator.h"
 #include "Meteorites.Core/Meteoroids/MonteCarloGenerator.h"
@@ -28,14 +28,18 @@ constexpr uint32_t SEED          = 25102018;
 constexpr real   TIMEOUT         = (real)60.0 * 30;
 
 constexpr size_t STAGE1_N_TOTAL  = 1000000;
-constexpr size_t STAGE1_N_TOP    = 100;
+constexpr size_t STAGE1_N_TOP    = 1000;
 constexpr auto   STAGE1_METHOD   = NumericalAlgorithm::TWO_STEP_ADAMS;
 constexpr real   STAGE1_DT       = (real)1e-3;
 using            STAGE1_FUNC     = L2Functional;
 
+constexpr size_t STAGE2_N_TOP    = 100;
 constexpr auto   STAGE2_METHOD   = NumericalAlgorithm::THREE_STEP_ADAMS;
 constexpr real   STAGE2_DT       = (real)1e-4;
 using            STAGE2_FUNC     = L2Functional;
+
+constexpr size_t EXPORT_N_GROUPS = 4;
+constexpr real   EXPORT_DT       = (real)0.01;
 
 #if defined(METEORITES_CUDA)
   constexpr bool   USE_GPU = true;
@@ -57,6 +61,16 @@ class MyProgressBar : public indicators::ProgressBar
                     indicators::option::ShowElapsedTime{ true },
                     indicators::option::ShowRemainingTime{ true })
     { }
+
+    // Update progress bar every 1% of total work
+    static constexpr float Step = 0.01f;
+
+    // Saves a few lines of code
+    static std::function<void(float)> Create()
+    {
+      return [bar = std::make_shared<MyProgressBar>()](float progress) mutable -> void
+      { bar->set_progress((size_t)(100 * progress)); };
+    }
 };
 
 
@@ -98,14 +112,10 @@ int main()
     std::cout << "     Meteoroids: " << STAGE1_N_TOTAL   << " pcs" << std::endl;
     std::cout << "     Method:     " << (uint32_t)STAGE1_METHOD << "-step Adams" << std::endl;
     std::cout << "     dt:         " << STAGE1_DT << " seconds" << std::endl;
-    std::vector<std::pair<VirtualMeteoroid, double> > good_meteoroids;
+    std::vector<std::pair<VirtualMeteoroid, double> > stage1_meteoroids;
     {
       MonteCarloGenerator generator(meteorite, params, STAGE1_N_TOTAL, SEED);
-      generator.OnProgress
-      (
-        [bar = std::make_shared<MyProgressBar>()](float progress) mutable -> void
-        { bar->set_progress((size_t)(100 * progress)); }, 0.01f
-      );
+      generator.OnProgress(MyProgressBar::Create(), MyProgressBar::Step);
       STAGE1_FUNC functional(meteorite);
       MetaRecorder meta_fmt(STAGE1_N_TOP, STAGE1_N_TOP * 10);
 
@@ -120,33 +130,63 @@ int main()
       solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
       solver->Solve(generator, functional, meta_fmt);
     
-      meta_fmt.ExportAndReset(good_meteoroids);
-      assert(good_meteoroids.size() == STAGE1_N_TOP);
+      meta_fmt.ExportAndReset(stage1_meteoroids);
+      assert(stage1_meteoroids.size() == STAGE1_N_TOP);
     }
     std::cout << std::endl;
 
     // Stage 2.
-    // Recompute them with better precision, store as tables
+    // Recompute them with better precision, store their trajectories
+    // After that, sort them again and truncate
     std::cout << "Stage 2. Recomputing trajectories of the best virtual meteoroids with high precision";
     std::cout << std::endl;
     std::cout << "     Meteoroids: " << STAGE1_N_TOP << " pcs" << std::endl;
     std::cout << "     Method:     " << (uint32_t)STAGE2_METHOD << "-step Adams" << std::endl;
     std::cout << "     dt:         " << STAGE2_DT << " seconds" << std::endl;
+    std::vector<MeteoroidTrajectory> stage2_trajectories;
     {
       GoldSolver solver;
       solver.Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
 
       STAGE2_FUNC functional(meteorite);
-      CsvRecorder csv_fmt(std::filesystem::current_path(), meteorite.Name(), 0.01f);
-      CollectionGenerator generator(good_meteoroids);
-      generator.OnProgress
-      (
-        [bar = std::make_shared<MyProgressBar>()](float progress) mutable -> void
-        { bar->set_progress((size_t)(100 * progress)); }, 0.01f
-      );
-      ((ISolver &)solver).Solve(generator, functional, csv_fmt);
+      BufferingRecorder rec(EXPORT_DT);
+      CollectionGenerator generator(stage1_meteoroids);
+      stage1_meteoroids.clear();
+      generator.OnProgress(MyProgressBar::Create(), MyProgressBar::Step);
+      ((ISolver &)solver).Solve(generator, functional, rec);
+      
+      rec.MoveTo(stage2_trajectories);
+      assert(stage2_trajectories.size() == STAGE1_N_TOP);
+      std::sort(stage2_trajectories.begin(), stage2_trajectories.end(),
+                [](const MeteoroidTrajectory &a, const MeteoroidTrajectory &b) -> bool
+                { return a.Accuracy() < b.Accuracy(); });
+      
+      assert(STAGE2_N_TOP < stage2_trajectories.size());
+      stage2_trajectories.erase(stage2_trajectories.begin() + STAGE2_N_TOP,
+                                stage2_trajectories.end());
     }
     std::cout << std::endl;
+
+    // Done! Save the results using different exporters
+    std::cout << "Saving the results" << std::endl;
+    std::cout << "     Meteoroids: " << STAGE2_N_TOP << " pcs" << std::endl;
+    std::vector<std::pair<std::string, std::shared_ptr<IExporter>>> exporters
+    {
+      std::make_pair(std::string("Representing meteoroid parameters as mean and standard deviation"),
+                     std::shared_ptr<IExporter>(new MeanStdevExporter(EXPORT_N_GROUPS))),
+      std::make_pair(std::string("Storing trajectories as *.csv tables with timestamps"),
+                     std::shared_ptr<IExporter>(new TrajectoryExporter(EXPORT_DT)))
+    };
+    for (const auto &rec : exporters)
+    {
+      std::cout << "     " << rec.first << std::endl;
+      rec.second->OnProgress(MyProgressBar::Create(), MyProgressBar::Step);
+      rec.second->SetDirectory(std::filesystem::current_path() / meteorite.Name());
+      rec.second->SetMetaData("now", meteorite); // TODO: use C++20 and 'date' to format the actual time
+      rec.second->Export(stage2_trajectories);
+    }
+    std::cout << std::endl;
+
     std::cout << "Success!" << std::endl;
   }
   catch (std::exception &ex)

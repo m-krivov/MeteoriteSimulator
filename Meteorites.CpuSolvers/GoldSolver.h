@@ -1,7 +1,7 @@
 #pragma once
 #include "Meteorites.Core/Defs.h"
 
-#include "Meteorites.Core/BasicSolver.h"
+#include "Meteorites.Core/Solvers/BasicSolver.h"
 
 
 // Uses one-step, two-step or three-step Adams method to solve ordinary differential equations

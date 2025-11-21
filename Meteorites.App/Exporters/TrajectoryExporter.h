@@ -7,6 +7,7 @@
 class TrajectoryExporter : public BasicExporter
 {
   public:
+    TrajectoryExporter() = delete;
     TrajectoryExporter(real dt) : dt_(dt) { }
 
     // The member of 'IExporter'

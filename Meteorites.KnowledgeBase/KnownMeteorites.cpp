@@ -48,6 +48,11 @@ KnownMeteorites::KnownMeteorites()
     predefined_.emplace(ID::PEEKSKILL, records[0]);
   }
   {
+    auto records = Get("Kosice", "https://doi.org/10.1007/978-3-319-46179-3_8");
+    assert(records.size() >= 1);
+    predefined_.emplace(ID::KOSICE, records[0]);
+  }
+  {
     auto records = Get("Chelyabinsk", "https://doi.org/10.1038/nature12671");
     assert(records.size() >= 1);
     predefined_.emplace(ID::CHELYABINSK, records[0]);

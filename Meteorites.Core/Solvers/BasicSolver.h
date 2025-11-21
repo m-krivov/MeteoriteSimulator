@@ -1,6 +1,8 @@
 #pragma once
 #include "Meteorites.Core/Defs.h"
-#include "Meteorites.Core/ISolver.h"
+
+#include "ISolver.h"
+
 
 // Implements some common logic
 class BasicSolver : public ISolver

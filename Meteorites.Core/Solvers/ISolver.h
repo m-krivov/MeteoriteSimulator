@@ -1,5 +1,5 @@
 #pragma once
-#include "Defs.h"
+#include "Meteorites.Core/Defs.h"
 
 #include "Meteorites.Core/Functionals/IFunctional.h"
 #include "Meteorites.Core/Meteoroids/IMeteoroidGenerator.h"
