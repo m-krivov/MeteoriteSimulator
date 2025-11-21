@@ -1,6 +1,7 @@
 #include "PrecisionEstimator.h"
 
-#include "Meteorites.Core/ResultFormatters.h"
+#include "Meteorites.Core/Functionals/FakeFunctional.h"
+#include "Meteorites.Core/Recorders/BufferingRecorder.h"
 
 namespace
 {
@@ -23,12 +24,12 @@ std::string ToString(double value)
 }
 
 // For each log, determines the number of record that corresponds to normalized 'time'
-std::vector<size_t> GetTimePoints(const std::vector<BufferingFormatter::Log> &logs, real time)
+std::vector<size_t> GetTimePoints(const std::vector<MeteoroidTrajectory> &logs, real time)
 {
   auto t_end = std::numeric_limits<real>::max();
   for (const auto &log : logs)
   {
-    const auto &records = log.records;
+    const auto &records = log.Records();
     assert(!records.empty());
     t_end = std::min(t_end, records[records.size() - 1].t);
   }
@@ -38,7 +39,7 @@ std::vector<size_t> GetTimePoints(const std::vector<BufferingFormatter::Log> &lo
   auto t = t_end * time;
   for (size_t i = 0; i < logs.size(); i++)
   {
-    const auto &records = logs[i].records;
+    const auto &records = logs[i].Records();
     size_t lo = 0, hi = records.size();
     while (lo + 1 < hi)
     {
@@ -76,13 +77,13 @@ real ToDegrees(real rads)
 
 } // unnamed namespace
 
-void PrecisionEstimator::CompareMethods(const Case &problem, real dt, std::ostream &str)
+void PrecisionEstimator::CompareMethods(const VirtualMeteoroid &problem, real dt, std::ostream &str)
 {
   assert(dt <= 1e-1f);
 
   // Prepare data that we want to analyze
   GoldSolver solver;
-  BufferingFormatter fmt(0.0f);
+  BufferingRecorder fmt(0.0f);
   FakeFunctional f;
 
   solver.Configure(NumericalAlgorithm::ONE_STEP_ADAMS, dt, TIMEOUT);
@@ -92,11 +93,11 @@ void PrecisionEstimator::CompareMethods(const Case &problem, real dt, std::ostre
   solver.Configure(NumericalAlgorithm::THREE_STEP_ADAMS, dt, TIMEOUT);
   solver.Solve(problem, f, fmt);
 
-  decltype(auto) logs = fmt.Logs();
+  decltype(auto) logs = fmt.Trajectories();
   assert(logs.size() == 3);
-  assert(!logs[0].records.empty());
-  assert(!logs[1].records.empty());
-  assert(!logs[2].records.empty());
+  assert(!logs[0].Records().empty());
+  assert(!logs[1].Records().empty());
+  assert(!logs[2].Records().empty());
 
   // Print tables
   auto n = GetTimePoints(logs, TIME_POINT);
@@ -105,7 +106,7 @@ void PrecisionEstimator::CompareMethods(const Case &problem, real dt, std::ostre
   str << "Method,m (kg),V (m/s),h (m), l (m),gamma (deg)," << std::endl;
   for (size_t i = 0; i < methods.size(); i++)
   {
-    const auto &record = logs[i].records[n[i]];
+    const auto &record = logs[i].Records()[n[i]];
     str << methods[i] << ','
         << ToString(record.M) << ','
         << ToString(record.V) << ','
@@ -118,8 +119,8 @@ void PrecisionEstimator::CompareMethods(const Case &problem, real dt, std::ostre
   str << "Method,m (%),V (%),h (%),l (%),gamma (%)," << std::endl;
   for (size_t i = 0; i < methods.size() - 1; i++)
   {
-    const auto &record = logs[i].records[n[i]];
-    const auto &ref_record = logs[logs.size() - 1].records[n[n.size() - 1]];
+    const auto &record = logs[i].Records()[n[i]];
+    const auto &ref_record = logs[logs.size() - 1].Records()[n[n.size() - 1]];
     str << methods[i] << ','
         << ToString(Eps(record.M, ref_record.M)) << ','
         << ToString(Eps(record.V, ref_record.V)) << ','
@@ -130,7 +131,7 @@ void PrecisionEstimator::CompareMethods(const Case &problem, real dt, std::ostre
   }
 }
 
-void PrecisionEstimator::CompareSteps(const Case &problem,
+void PrecisionEstimator::CompareSteps(const VirtualMeteoroid &problem,
                                       NumericalAlgorithm method,
                                       std::ostream &str)
 {
@@ -140,13 +141,13 @@ void PrecisionEstimator::CompareSteps(const Case &problem,
   std::array<real, 6> steps{ (real)1e-1, (real)1e-2, (real)1e-3,
                              (real)1e-4, (real)1e-5, (real)1e-6 };
 
-  BufferingFormatter fmt((real)0.0);
+  BufferingRecorder fmt((real)0.0);
   for (real dt : steps)
   {
     solver.Configure(method, dt, TIMEOUT);
     solver.Solve(problem, f, fmt);
   }
-  decltype(auto) logs = fmt.Logs();
+  decltype(auto) logs = fmt.Trajectories();
   assert(logs.size() == steps.size());
 
   // Print tables
@@ -154,7 +155,7 @@ void PrecisionEstimator::CompareSteps(const Case &problem,
   str << "dt (s),m (kg),V (m/s),h (m),l (m),gamma (deg)," << std::endl;
   for (size_t i = 0; i < steps.size(); i++)
   {
-    const auto &record = logs[i].records[n[i]];
+    const auto &record = logs[i].Records()[n[i]];
     str << steps[i] << ','
         << ToString(record.M) << ','
         << ToString(record.V) << ','
@@ -167,8 +168,8 @@ void PrecisionEstimator::CompareSteps(const Case &problem,
   str << "dt (s),m (%),V (%),h (%),l (%),gamma (%)," << std::endl;
   for (size_t i = 0; i < steps.size() - 1; i++)
   {
-    const auto &record = logs[i].records[n[i]];
-    const auto &ref_record = logs[logs.size() - 1].records[n[n.size() - 1]];
+    const auto &record = logs[i].Records()[n[i]];
+    const auto &ref_record = logs[logs.size() - 1].Records()[n[n.size() - 1]];
     str << steps[i] << ','
         << Eps(record.M, ref_record.M) << ','
         << Eps(record.V, ref_record.V) << ','
@@ -179,7 +180,7 @@ void PrecisionEstimator::CompareSteps(const Case &problem,
   }
 }
 
-void PrecisionEstimator::ComparePerturbations(const Case &p,
+void PrecisionEstimator::ComparePerturbations(const VirtualMeteoroid &p,
                                               NumericalAlgorithm method,
                                               real dt, std::ostream &str)
 {
@@ -194,20 +195,20 @@ void PrecisionEstimator::ComparePerturbations(const Case &p,
   std::array<std::string, 9> names{ "H", "Ch", "Rho", "Cd", "Cl",
                                     "M0", "V0", "h0", "Gamma0" };
 
-  BufferingFormatter fmt(dt);
+  BufferingRecorder fmt(dt);
   for (size_t i = 0; i < params.size(); i++)
   {
     for (size_t j = 0; j < peturbations.size(); j++)
     {
       auto new_params = params;
       new_params[i] += new_params[i] * peturbations[j];
-      Case problem(new_params[0], new_params[1], new_params[2], new_params[3], new_params[4],
-                   new_params[5], new_params[6], new_params[7], new_params[8]);
+      VirtualMeteoroid problem(new_params[0], new_params[1], new_params[2], new_params[3], new_params[4],
+                               new_params[5], new_params[6], new_params[7], new_params[8]);
       solver.Solve(problem, f, fmt);
     }
   }
   solver.Solve(p, f, fmt);
-  decltype(auto) logs = fmt.Logs();
+  decltype(auto) logs = fmt.Trajectories();
   assert(logs.size() == params.size() * peturbations.size() + 1);
 
   // Print tables
@@ -217,7 +218,7 @@ void PrecisionEstimator::ComparePerturbations(const Case &p,
     for (size_t j = 0; j < peturbations.size(); j++)
     {
       auto idx = j + i * peturbations.size();
-      const auto &records = logs[idx].records;
+      const auto &records = logs[idx].Records();
       const auto &record = records[records.size() - 1];
       str << names[i] << ","
           << peturbations[j] * 100 << ','
@@ -234,13 +235,13 @@ void PrecisionEstimator::ComparePerturbations(const Case &p,
 
   str << "parameter,perturbation (%),t_flight (%)," << std::endl;
   const auto &ref_log = logs[logs.size() - 1];
-  auto ref_time = ref_log.records[ref_log.records.size() - 1].t;
+  auto ref_time = ref_log.LastRecord().t;
   for (size_t i = 0; i < params.size(); i++)
   {
     for (size_t j = 0; j < peturbations.size(); j++)
     {
       auto idx = j + i * peturbations.size();
-      const auto &records = logs[idx].records;
+      const auto &records = logs[idx].Records();
       const auto &record = records[records.size() - 1];
       str << names[i] << ","
           << peturbations[j] * 100 << ','

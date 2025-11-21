@@ -1,6 +1,8 @@
 #pragma once
 #include "Meteorites.Core/Defs.h"
-#include "Meteorites.Core/ISolver.h"
+
+#include "ISolver.h"
+
 
 // Implements some common logic
 class BasicSolver : public ISolver
@@ -10,14 +12,14 @@ class BasicSolver : public ISolver
     virtual void Configure(NumericalAlgorithm alg, real dt, real timeout) override final;
 
     // ISolver method
-    virtual void Solve(const std::vector<Case> &problems,
+    virtual void Solve(const std::vector<VirtualMeteoroid> &problems,
                        const IFunctional &functional,
-                       IResultFormatter &results) override;
+                       ISimulationRecorder &results) override;
 
     // ISolver method
-    virtual void Solve(ICaseGenerator &generator,
+    virtual void Solve(IMeteoroidGenerator &generator,
                        const IFunctional &functional,
-                       IResultFormatter &results) override;
+                       ISimulationRecorder &results) override;
 
   protected:
     BasicSolver() = default;

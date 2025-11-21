@@ -1,10 +1,9 @@
 #pragma once
-#include "Defs.h"
+#include "Meteorites.Core/Defs.h"
 
-#include "Case.h"
-#include "Functionals.h"
-#include "ResultFormatters.h"
-#include "ICaseGenerator.h"
+#include "Meteorites.Core/Functionals/IFunctional.h"
+#include "Meteorites.Core/Meteoroids/IMeteoroidGenerator.h"
+#include "Meteorites.Core/Recorders/ISimulationRecorder.h"
 
 // The known numerical methods that may be used to solve ODEs
 enum class NumericalAlgorithm : uint32_t
@@ -29,21 +28,21 @@ class ISolver
     virtual void Configure(NumericalAlgorithm alg, real dt, real timeout) = 0;
 
     // Solves a single problem, computes functional value and sends solution to formatter
-    virtual void Solve(const Case &problem,
+    virtual void Solve(const VirtualMeteoroid &problem,
                        const IFunctional &functional,
-                       IResultFormatter &results) = 0;
+                       ISimulationRecorder &results) = 0;
 
     // Finds solutions for the fixed-size set of problems
     // This version may be parallelized
-    virtual void Solve(const std::vector<Case> &problems,
+    virtual void Solve(const std::vector<VirtualMeteoroid> &problems,
                        const IFunctional &functional,
-                       IResultFormatter &results) = 0;
+                       ISimulationRecorder &results) = 0;
 
     // Finds solutions for the problems represented by a stream
     // This version may be parallelized
-    virtual void Solve(ICaseGenerator &generator,
+    virtual void Solve(IMeteoroidGenerator &generator,
                        const IFunctional &functional,
-                       IResultFormatter &results) = 0;
+                       ISimulationRecorder &results) = 0;
 
   protected:
     ISolver() = default;

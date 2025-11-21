@@ -1,10 +1,11 @@
 #pragma once
-#include "Meteorites.GpuSolvers/CudaDefs.h"
-#include "Meteorites.Core/BasicSolver.h"
+#include "Meteorites.CudaSolvers/CudaDefs.h"
+
+#include "Meteorites.Core/Solvers/BasicSolver.h"
 
 
 // Settings for CudaSolver
-struct CudaSolverConfig
+struct PedanticCudaSolverConfig
 {
   // How many CUDA threads must be spawned per each block
   // Will be used to configure the grid for a CUDA kernel
@@ -18,38 +19,38 @@ struct CudaSolverConfig
   // Large numbers can lead to high memory usage
   size_t blocks_per_sm = 4;
 
-  CudaSolverConfig() = default;
-  CudaSolverConfig(const CudaSolverConfig &) = default;
-  CudaSolverConfig &operator =(const CudaSolverConfig &) = default;
+  PedanticCudaSolverConfig() = default;
+  PedanticCudaSolverConfig(const PedanticCudaSolverConfig &) = default;
+  PedanticCudaSolverConfig &operator =(const PedanticCudaSolverConfig &) = default;
 };
 
 // Version for CUDA kernel debugging
-class CudaSolver : public BasicSolver
+class PedanticCudaSolver : public BasicSolver
 {
   public:
-    CudaSolver(CudaSolverConfig config = CudaSolverConfig());
-    virtual ~CudaSolver();
+    PedanticCudaSolver(PedanticCudaSolverConfig config = PedanticCudaSolverConfig());
+    virtual ~PedanticCudaSolver();
 
     // ISolver method
-    virtual void Solve(const Case &problem,
+    virtual void Solve(const VirtualMeteoroid &problem,
                        const IFunctional &functional,
-                       IResultFormatter &results) override final;
+                       ISimulationRecorder &results) override final;
 
     // ISolver method
-    virtual void Solve(const std::vector<Case> &problems,
+    virtual void Solve(const std::vector<VirtualMeteoroid> &problems,
                        const IFunctional &functional,
-                       IResultFormatter &results) override final;
+                       ISimulationRecorder &results) override final;
 
     // ISolver method
-    virtual void Solve(ICaseGenerator &generator,
+    virtual void Solve(IMeteoroidGenerator &generator,
                        const IFunctional &functional,
-                       IResultFormatter &results) override final;
+                       ISimulationRecorder &results) override final;
   private:
     // How many meteorites must be simulated at one time
     size_t BatchSize() const;
 
     cudaDeviceProp props_{};
-    const CudaSolverConfig config_{};
+    const PedanticCudaSolverConfig config_{};
 
     CudaPtr<uint8_t> buffer_counter_;
     CudaPtr<uint8_t> buffer_problems_;
