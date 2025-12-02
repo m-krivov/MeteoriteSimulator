@@ -73,6 +73,34 @@ class MyProgressBar : public indicators::ProgressBar
     }
 };
 
+std::string ToString(NumericalAlgorithm alg)
+{
+  switch (alg)
+  {
+    case NumericalAlgorithm::ONE_STEP_ADAMS:
+      return "One-step Adams";
+
+    case NumericalAlgorithm::TWO_STEP_ADAMS:
+      return "Two-step Adams";
+
+    case NumericalAlgorithm::THREE_STEP_ADAMS:
+      return "Three-step Adams";
+
+    default:
+      return "Unknown algorithm";
+  }
+}
+
+std::unique_ptr<ISolver> CreateSolver()
+{
+#if defined(METEORITES_CUDA)
+  if constexpr (USE_GPU)
+  { return std::make_unique<PedanticCudaSolver>(); }
+  else
+#endif
+  { return std::make_unique<GoldSolver>(); }
+}
+
 
 int main()
 {
@@ -110,27 +138,20 @@ int main()
     std::cout << "Stage 1. Computing huge amount of virtual meteoroids with low precision";
     std::cout << std::endl;
     std::cout << "     Meteoroids: " << STAGE1_N_TOTAL   << " pcs" << std::endl;
-    std::cout << "     Method:     " << (uint32_t)STAGE1_METHOD << "-step Adams" << std::endl;
+    std::cout << "     Method:     " << ToString(STAGE1_METHOD) << std::endl;
     std::cout << "     dt:         " << STAGE1_DT << " seconds" << std::endl;
     std::vector<std::pair<VirtualMeteoroid, double> > stage1_meteoroids;
     {
       MonteCarloGenerator generator(meteorite, params, STAGE1_N_TOTAL, SEED);
       generator.OnProgress(MyProgressBar::Create(), MyProgressBar::Step);
       STAGE1_FUNC functional(meteorite);
-      MetaRecorder meta_fmt(STAGE1_N_TOP, STAGE1_N_TOP * 10);
+      MetaRecorder recorder(STAGE1_N_TOP, STAGE1_N_TOP * 10);
 
-      std::unique_ptr<ISolver> solver;
-    #if defined(METEORITES_CUDA)
-      if constexpr (USE_GPU)
-      { solver.reset(new PedanticCudaSolver()); }
-      else
-    #endif
-      { solver.reset(new GoldSolver()); }
-
+      std::unique_ptr<ISolver> solver = CreateSolver();
       solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
-      solver->Solve(generator, functional, meta_fmt);
+      solver->Solve(generator, functional, recorder);
     
-      meta_fmt.ExportAndReset(stage1_meteoroids);
+      recorder.ExportAndReset(stage1_meteoroids);
       assert(stage1_meteoroids.size() == STAGE1_N_TOP);
     }
     std::cout << std::endl;
@@ -141,21 +162,21 @@ int main()
     std::cout << "Stage 2. Recomputing trajectories of the best virtual meteoroids with high precision";
     std::cout << std::endl;
     std::cout << "     Meteoroids: " << STAGE1_N_TOP << " pcs" << std::endl;
-    std::cout << "     Method:     " << (uint32_t)STAGE2_METHOD << "-step Adams" << std::endl;
+    std::cout << "     Method:     " << ToString(STAGE2_METHOD) << std::endl;
     std::cout << "     dt:         " << STAGE2_DT << " seconds" << std::endl;
     std::vector<MeteoroidTrajectory> stage2_trajectories;
     {
-      GoldSolver solver;
-      solver.Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
+      std::unique_ptr<ISolver> solver = std::make_unique<GoldSolver>();
+      solver->Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
 
       STAGE2_FUNC functional(meteorite);
-      BufferingRecorder rec(EXPORT_DT);
+      BufferingRecorder recorder(EXPORT_DT);
       CollectionGenerator generator(stage1_meteoroids);
-      stage1_meteoroids.clear();
       generator.OnProgress(MyProgressBar::Create(), MyProgressBar::Step);
-      ((ISolver &)solver).Solve(generator, functional, rec);
+      stage1_meteoroids.clear();
+      solver->Solve(generator, functional, recorder);
       
-      rec.MoveTo(stage2_trajectories);
+      recorder.MoveTo(stage2_trajectories);
       assert(stage2_trajectories.size() == STAGE1_N_TOP);
       std::sort(stage2_trajectories.begin(), stage2_trajectories.end(),
                 [](const MeteoroidTrajectory &a, const MeteoroidTrajectory &b) -> bool

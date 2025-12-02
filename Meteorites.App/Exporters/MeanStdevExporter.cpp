@@ -106,6 +106,18 @@ void MeanStdevExporter::Export(const std::vector<MeteoroidTrajectory> &trajector
     { "Heat transfer coefficient", [](const MeteoroidTrajectory &m) -> real { return m.Meteoroid().Ch; } }
   };
 
+  // In addition, classify meteoroids by the reason why simulation was ended
+  parameters.push_back
+  ({
+    "Probability of combustion, %", [](const MeteoroidTrajectory &m) -> real
+    { return m.Reason() == ISimulationRecorder::Reason::Burnt ? (real)100.0 : (real)0.0; }
+  });
+  parameters.push_back
+  ({
+    "Probability of collision, %", [](const MeteoroidTrajectory &m) -> real
+    { return m.Reason() == ISimulationRecorder::Reason::Collided ? (real)100.0 : (real)0.0; }
+  });
+
   for (size_t i = 0; i < parameters.size(); i++)
   {
     ExportParameter(mean_file, mean_stdev_file, parameters[i].first,
