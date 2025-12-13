@@ -28,6 +28,11 @@ if(${METEORITES_CUDA})
   include_directories(${CUDAToolkit_INCLUDE_DIRS})
 endif()
 
+set(METEORITES_GNUPLOT false CACHE BOOL "Enable visualization, requires gnuplot to be installed")
+if(${METEORITES_GNUPLOT})
+  add_compile_definitions(METEORITES_GNUPLOT)
+endif()
+
 set(ROOT_DIR      "${CMAKE_SOURCE_DIR}")
 set(BIN_DIR       "${ROOT_DIR}/Bin")
 set(3RDPARTY_DIR  "${ROOT_DIR}/3rdParty")
@@ -120,6 +125,9 @@ configure_cpp_proj(Meteorites.App "meteorites"
                    Meteorites.CpuSolvers
                    Meteorites.Core
                    indicators)
+if(${METEORITES_GNUPLOT})
+  target_link_libraries(Meteorites.App matplotpp)
+endif()
 
 
 find_cpp_sources(${ROOT_DIR}/Meteorites.Benchmark METEORITES_BENCHMARK_H METEORITES_BENCHMARK_CPP METEORITES_BENCHMARK_CU)

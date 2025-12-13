@@ -1,5 +1,9 @@
 #include "TrajectoryExporter.h"
 
+#if defined(METEORITES_GNUPLOT)
+  #include <matplot/matplot.h>
+#endif
+
 #include "Meteorites.Core/Recorders/CsvRecorder.h"
 
 void TrajectoryExporter::Export(const std::vector<MeteoroidTrajectory> &trajectories)

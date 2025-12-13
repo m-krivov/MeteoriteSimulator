@@ -2,9 +2,10 @@
 # A home-made analogue of the 'FetchContent()' routine
 # Yes, I have a few reason to avoid using CMake's ExternalProject or git's submodules
 macro(fetch_3rd_party
-      repo_url commit_hash target_name
+      repo_url commit_hash target_name cmake_options
       include_subpath release_lib_subpath debug_lib_subpath)
-  set(_3rd_party_dir         "${3RDPARTY_DIR}/${target_name}")
+  set(_3rd_party_arch        "${CMAKE_CXX_COMPILER_ID}_${CMAKE_SYSTEM_PROCESSOR}")
+  set(_3rd_party_dir         "${3RDPARTY_DIR}/${target_name}/${commit_hash}/${_3rd_party_arch}")
   set(_3rd_party_include     "${_3rd_party_dir}/${include_subpath}")
   set(_3rd_party_bin         "${_3rd_party_dir}/_Bin")
   set(_3rd_party_release_lib "${_3rd_party_bin}/${release_lib_subpath}")
@@ -39,6 +40,8 @@ macro(fetch_3rd_party
                                 -B "${_3rd_party_bin}"
                                 -G ${CMAKE_GENERATOR}
                                 -A ${CMAKE_GENERATOR_PLATFORM}
+                                ${cmake_options}
+                                -DCMAKE_BUILD_TYPE=Debug;Release
                                 -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
                                 -DMSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
                                 --no-warn-unused-cli
@@ -49,7 +52,8 @@ macro(fetch_3rd_party
         execute_process(COMMAND ${CMAKE_COMMAND}
                                 -B "${_3rd_party_bin}"
                                 -G ${CMAKE_GENERATOR}
-                                -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
+                                ${cmake_options}
+                                -DCMAKE_BUILD_TYPE=Debug;Release
                                 -DMSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
                                 --no-warn-unused-cli
                         WORKING_DIRECTORY ${_3rd_party_dir}
@@ -60,7 +64,7 @@ macro(fetch_3rd_party
       execute_process(COMMAND ${CMAKE_COMMAND}
                                 -B "${_3rd_party_bin}"
                                 -G ${CMAKE_GENERATOR}
-                                -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
+                                ${cmake_options}
                                 --no-warn-unused-cli
                         WORKING_DIRECTORY ${_3rd_party_dir}
                         RESULTS_VARIABLE _3rd_party_err_code
@@ -73,9 +77,11 @@ macro(fetch_3rd_party
     execute_process(COMMAND ${CMAKE_COMMAND}
                             --build "${_3rd_party_bin}"
                             --config Release
+                            --parallel 6
                     WORKING_DIRECTORY ${_3rd_party_dir}
                     RESULTS_VARIABLE _3rd_party_err_code
-                    OUTPUT_QUIET)
+                    OUTPUT_QUIET
+                    )
     if(${_3rd_party_err_code})
       message(FATAL_ERROR "Failed to compile 3rd-party library: ${target_name} (Release)")
     endif()
@@ -84,6 +90,7 @@ macro(fetch_3rd_party
       execute_process(COMMAND ${CMAKE_COMMAND}
                               --build "${_3rd_party_bin}"
                               --config Debug
+                              --parallel 6
                       WORKING_DIRECTORY ${_3rd_party_dir}
                       RESULTS_VARIABLE _3rd_party_err_code
                       OUTPUT_QUIET)
@@ -144,6 +151,7 @@ if(MSVC)
   fetch_3rd_party("https://github.com/google/googletest.git"
                   "2f3e2e39cc4c399b66711e6b720bf22373e841b5"
                   googletest
+                  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
                   "googletest/include"
                   "lib/Release/gtest.lib"
                   "lib/Debug/gtestd.lib")
@@ -151,6 +159,7 @@ else()
   fetch_3rd_party("https://github.com/google/googletest.git"
                   "2f3e2e39cc4c399b66711e6b720bf22373e841b5"
                   googletest
+                  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
                   "googletest/include"
                   "lib/libgtest.a"
                   "lib/libgtest.a")
@@ -165,3 +174,29 @@ set(INDICATORS_VER "2.3")
 download_3rd_party(indicators
                    "https://github.com/p-ranav/indicators/archive/refs/tags/v${INDICATORS_VER}.zip"
                    "indicators-${INDICATORS_VER}/include")
+
+### Matplot++ ###
+
+if(${METEORITES_GNUPLOT})
+  if(MSVC)
+    fetch_3rd_party("https://github.com/alandefreitas/matplotplusplus.git"
+                    "b2fed97fca6e7a5380efe14ec76e227c2087b77e"
+                    matplotpp
+                    -DMATPLOTPP_BUILD_EXAMPLES=OFF
+                    "source"
+                    "source/matplot/Release/matplot.lib"
+                    "source/matplot/Debug/matplot.lib")
+  else()
+    fetch_3rd_party("https://github.com/alandefreitas/matplotplusplus.git"
+                    "b2fed97fca6e7a5380efe14ec76e227c2087b77e"
+                    matplotpp
+                    -DMATPLOTPP_BUILD_EXAMPLES=OFF
+                    "source"
+                    "source/matplot/libmatplot.a"
+                    "source/matplot/libmatplot.a")
+  endif()
+  # TODO: replace by introducing global variables for home directories
+  file(COPY_FILE
+       "${3RDPARTY_DIR}/matplotpp/b2fed97fca6e7a5380efe14ec76e227c2087b77e/${CMAKE_CXX_COMPILER_ID}_${CMAKE_SYSTEM_PROCESSOR}/_Bin/source/matplot/matplot/detail/exports.h"
+       "${3RDPARTY_DIR}/matplotpp/b2fed97fca6e7a5380efe14ec76e227c2087b77e/${CMAKE_CXX_COMPILER_ID}_${CMAKE_SYSTEM_PROCESSOR}/source/matplot/detail/exports.h")
+endif()
