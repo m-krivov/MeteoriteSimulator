@@ -20,6 +20,7 @@
 
 #include "Exporters/MeanStdevExporter.h"
 #include "Exporters/TrajectoryExporter.h"
+#include "Exporters/TrajectoryVisualizer.h"
 
 
 constexpr auto   METEORITE       = KnownMeteorites::ID::INNISFREE;
@@ -195,8 +196,10 @@ int main()
     {
       std::make_pair(std::string("Representing meteoroid parameters as mean and standard deviation"),
                      std::shared_ptr<IExporter>(new MeanStdevExporter(EXPORT_N_GROUPS))),
-      std::make_pair(std::string("Storing trajectories as *.csv tables with timestamps"),
-                     std::shared_ptr<IExporter>(new TrajectoryExporter(EXPORT_DT)))
+      std::make_pair(std::string("Storing trajectories as *.csv tables"),
+                     std::shared_ptr<IExporter>(new TrajectoryExporter(EXPORT_DT))),
+      std::make_pair(std::string("Visualizing trajectories as *.png images"),
+                     std::shared_ptr<IExporter>(new TrajectoryVisualizer(EXPORT_DT)))
     };
     for (const auto &rec : exporters)
     {

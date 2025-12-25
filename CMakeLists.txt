@@ -35,7 +35,6 @@ endif()
 
 set(ROOT_DIR      "${CMAKE_SOURCE_DIR}")
 set(BIN_DIR       "${ROOT_DIR}/Bin")
-set(3RDPARTY_DIR  "${ROOT_DIR}/3rdParty")
 
 if(NOT EXISTS ${BIN_DIR})
   file(MAKE_DIRECTORY "${BIN_DIR}")
@@ -95,7 +94,11 @@ macro(configure_cpp_proj target proj_name)
 endmacro()
 
 
-include(3rdParty.cmake)
+include(DepCache.cmake)
+depcache_googletest(googletest)
+if(${METEORITES_GNUPLOT})
+  depcache_matplotpp(matplotpp)
+endif()
 
 find_cpp_sources(${ROOT_DIR}/Meteorites.Core METEORITES_CORE_H METEORITES_CORE_CPP METEORITES_CORE_CU)
 add_library(Meteorites.Core STATIC ${METEORITES_CORE_H} ${METEORITES_CORE_CPP} ${METEORITES_CORE_CU})
@@ -135,7 +138,8 @@ add_executable(Meteorites.Benchmark ${METEORITES_BENCHMARK_H} ${METEORITES_BENCH
 configure_cpp_proj(Meteorites.Benchmark "meteorites.benchmark"
                    Meteorites.KnowledgeBase
                    Meteorites.CpuSolvers
-                   Meteorites.Core)
+                   Meteorites.Core
+                   googletest)
 
 
 find_cpp_sources(${ROOT_DIR}/Meteorites.Tests METEORITES_TESTS_H METEORITES_TESTS_CPP METEORITES_TESTS_CU)
