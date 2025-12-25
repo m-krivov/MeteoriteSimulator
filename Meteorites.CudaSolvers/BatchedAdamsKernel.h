@@ -42,8 +42,8 @@ struct ThreadContext
 
 
 template <unsigned int STEPS>
-void BatchedAdamsKernel(ThreadContext<STEPS> *contexts, uint32_t *active_threads,
+void BatchedAdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_threads,
                         const VirtualMeteoroid *problems, size_t n_problems, real dt, real timeout,
                         const real *timestamps, size_t n_timestamps,
                         real *functional_args, Record *records,
-                        size_t iterations, size_t threads_per_block);
+                        size_t iterations, size_t threads_per_block, cudaStream_t stream);

@@ -4,9 +4,11 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <future>
 #include <memory>
 #include <numeric>
 #include <optional>
