@@ -7,7 +7,7 @@
 
 // Contains a few values extracted from Adams::Layer
 // They could be passed to formatters
-struct Record
+struct alignas(32) Record
 {
   real t{}, M{}, V{}, h{}, l{}, Gamma{};
 
