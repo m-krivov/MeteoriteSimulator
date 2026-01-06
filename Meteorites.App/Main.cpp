@@ -2,6 +2,7 @@
 #include <iostream>
 #include <indicators/cursor_control.hpp>
 #include <indicators/progress_bar.hpp>
+#include <indicators/progress_spinner.hpp>
 
 #include "Meteorites.Core/Functionals/CFunctional.h"
 #include "Meteorites.Core/Functionals/L1Functional.h"
@@ -23,24 +24,25 @@
 #include "Exporters/TrajectoryVisualizer.h"
 
 
-constexpr auto   METEORITE       = KnownMeteorites::ID::INNISFREE;
-constexpr auto   PARAMETERS      = Distribution::UNIFORM_ANY;
-constexpr uint32_t SEED          = 25102018;
-constexpr real   TIMEOUT         = (real)60.0 * 30;
+constexpr auto     METEORITE         = KnownMeteorites::ID::INNISFREE;
+constexpr auto     PARAMETERS        = Distribution::UNIFORM_ANY;
+constexpr uint32_t SEED              = 25102018;
+constexpr float    PROGRESS_BAR_STEP = 0.01f;
+constexpr real     TIMEOUT           = (real)60.0 * 30;
 
-constexpr size_t STAGE1_N_TOTAL  = 1000000;
-constexpr size_t STAGE1_N_TOP    = 1000;
-constexpr auto   STAGE1_METHOD   = NumericalAlgorithm::TWO_STEP_ADAMS;
-constexpr real   STAGE1_DT       = (real)1e-3;
-using            STAGE1_FUNC     = L2Functional;
+constexpr size_t   STAGE1_N_TOTAL    = 1000000;
+constexpr size_t   STAGE1_N_TOP      = 1000;
+constexpr auto     STAGE1_METHOD     = NumericalAlgorithm::TWO_STEP_ADAMS;
+constexpr real     STAGE1_DT         = (real)1e-3;
+using              STAGE1_FUNC       = L2Functional;
 
-constexpr size_t STAGE2_N_TOP    = 100;
-constexpr auto   STAGE2_METHOD   = NumericalAlgorithm::THREE_STEP_ADAMS;
-constexpr real   STAGE2_DT       = (real)1e-4;
-using            STAGE2_FUNC     = L2Functional;
+constexpr size_t   STAGE2_N_TOP      = 100;
+constexpr auto     STAGE2_METHOD     = NumericalAlgorithm::THREE_STEP_ADAMS;
+constexpr real     STAGE2_DT         = (real)1e-4;
+using              STAGE2_FUNC       = L2Functional;
 
-constexpr size_t EXPORT_N_GROUPS = 4;
-constexpr real   EXPORT_DT       = (real)0.01;
+constexpr size_t   EXPORT_N_GROUPS   = 4;
+constexpr real     EXPORT_DT         = (real)0.1;
 
 #if defined(METEORITES_CUDA)
   constexpr bool   USE_GPU = true;
@@ -53,18 +55,18 @@ class MyProgressBar : public indicators::ProgressBar
 {
   public:
     MyProgressBar()
-      : ProgressBar(indicators::option::BarWidth{ 60 },
-                    indicators::option::Fill{ "#" },
-                    indicators::option::Lead{ "#" },
-                    indicators::option::Remainder{ "-" },
-                    indicators::option::PrefixText{ "     " },
-                    indicators::option::ShowPercentage{ true },
-                    indicators::option::ShowElapsedTime{ true },
-                    indicators::option::ShowRemainingTime{ true })
+      : ProgressBar
+      (
+        indicators::option::BarWidth{ 60 },
+        indicators::option::Fill{ "#" },
+        indicators::option::Lead{ "#" },
+        indicators::option::Remainder{ "-" },
+        indicators::option::PrefixText{ "     " },
+        indicators::option::ShowPercentage{ true },
+        indicators::option::ShowElapsedTime{ true },
+        indicators::option::ShowRemainingTime{ true }
+      )
     { }
-
-    // Update progress bar every 1% of total work
-    static constexpr float Step = 0.01f;
 
     // Saves a few lines of code
     static std::function<void(float)> Create()
@@ -72,6 +74,28 @@ class MyProgressBar : public indicators::ProgressBar
       return [bar = std::make_shared<MyProgressBar>()](float progress) mutable -> void
       { bar->set_progress((size_t)(100 * progress)); };
     }
+};
+
+// The same for spinner: simple animation, percentage and nothing more
+class MyProgressSpinner : public indicators::ProgressSpinner
+{
+  public:
+    MyProgressSpinner(const std::string &title)
+      : ProgressSpinner
+      (
+        indicators::option::PrefixText{title},
+        indicators::option::SpinnerStates{std::vector<std::string>{" ", " " }},
+        indicators::option::ShowSpinner(true),
+        indicators::option::ShowPercentage(true)
+      )
+    {}
+
+    static std::function<void(float)> Create(const std::string &title)
+    {
+      return [spinner = std::make_shared<MyProgressSpinner>(title)](float progress) mutable -> void
+      { spinner->set_progress((size_t)(100 * progress)); };
+    }
+
 };
 
 std::string ToString(NumericalAlgorithm alg)
@@ -144,7 +168,7 @@ int main()
     std::vector<std::pair<VirtualMeteoroid, double> > stage1_meteoroids;
     {
       MonteCarloGenerator generator(meteorite, params, STAGE1_N_TOTAL, SEED);
-      generator.OnProgress(MyProgressBar::Create(), MyProgressBar::Step);
+      generator.OnProgress(MyProgressBar::Create(), PROGRESS_BAR_STEP);
       STAGE1_FUNC functional(meteorite);
       MetaRecorder recorder(STAGE1_N_TOP, STAGE1_N_TOP * 10);
 
@@ -173,7 +197,7 @@ int main()
       STAGE2_FUNC functional(meteorite);
       BufferingRecorder recorder(EXPORT_DT);
       CollectionGenerator generator(stage1_meteoroids);
-      generator.OnProgress(MyProgressBar::Create(), MyProgressBar::Step);
+      generator.OnProgress(MyProgressBar::Create(), PROGRESS_BAR_STEP);
       stage1_meteoroids.clear();
       solver->Solve(generator, functional, recorder);
       
@@ -194,20 +218,26 @@ int main()
     std::cout << "     Meteoroids: " << STAGE2_N_TOP << " pcs" << std::endl;
     std::vector<std::pair<std::string, std::shared_ptr<IExporter>>> exporters
     {
-      std::make_pair(std::string("Representing meteoroid parameters as mean and standard deviation"),
+      std::make_pair(std::string("Represent meteoroid parameters as mean and standard deviation"),
                      std::shared_ptr<IExporter>(new MeanStdevExporter(EXPORT_N_GROUPS))),
-      std::make_pair(std::string("Storing trajectories as *.csv tables"),
+      std::make_pair(std::string("Store trajectories as *.csv tables"),
                      std::shared_ptr<IExporter>(new TrajectoryExporter(EXPORT_DT))),
-      std::make_pair(std::string("Visualizing trajectories as *.png images"),
-                     std::shared_ptr<IExporter>(new TrajectoryVisualizer(EXPORT_DT)))
     };
+#if defined(METEORITES_GNUPLOT)
+    exporters.emplace_back
+    (
+      std::make_pair(std::string("Visualize trajectories as *.png images"),
+                     std::shared_ptr<IExporter>(new TrajectoryVisualizer(meteorite)))
+    );
+#endif
+
     for (const auto &rec : exporters)
     {
-      std::cout << "     " << rec.first << std::endl;
-      rec.second->OnProgress(MyProgressBar::Create(), MyProgressBar::Step);
+      rec.second->OnProgress(MyProgressSpinner::Create(std::string("     ") + rec.first), PROGRESS_BAR_STEP);
       rec.second->SetDirectory(std::filesystem::current_path() / meteorite.Name());
       rec.second->SetMetaData("now", meteorite); // TODO: use C++20 and 'date' to format the actual time
       rec.second->Export(stage2_trajectories);
+      std::cout << std::endl;
     }
     std::cout << std::endl;
 
