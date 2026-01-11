@@ -311,13 +311,11 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
   auto f = figure();
   assert(f);
 
-  f->size(1000, 1000);
-  f->font_size(10);
+  f->size(1200, 1200);
   f->title(meteorite_.Name());
-  f->title_font_size_multiplier(3.0f);
 
   {
-    auto ax = subplot(3, 2, 0);
+    auto ax = subplot(f, 3, 2, 0);
     assert(ax);
     xlabel(ax, "Time, seconds");
     xlim(ax, { 0.0, t_end });
@@ -331,7 +329,7 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
   UpdateProgress(1, 4);
 
   {
-    auto ax = subplot(3, 2, 1);
+    auto ax = subplot(f, 3, 2, 1);
     assert(ax);
     xlabel(ax, "Time, seconds");
     xlim(ax, { 0.0, t_end });
@@ -345,7 +343,7 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
   UpdateProgress(2, 4);
 
   {
-    auto ax = subplot(3, 2, 2);
+    auto ax = subplot(f, 3, 2, 2);
     assert(ax);
     xlabel(ax, "Time, seconds");
     xlim(ax, { 0.0, t_end });
@@ -357,7 +355,7 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
   UpdateProgress(3, 4);
   
   {
-    auto ax = subplot(3, 2, { 4, 5 });
+    auto ax = f->add_subplot(3, 2, { 4, 5 });
     assert(ax);
     xlabel(ax, "Distance, km");
     ylabel(ax, "Height, km");

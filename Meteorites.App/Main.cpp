@@ -22,6 +22,7 @@
 #include "Exporters/MeanStdevExporter.h"
 #include "Exporters/TrajectoryExporter.h"
 #include "Exporters/TrajectoryVisualizer.h"
+#include "Exporters/HistogramBuilder.h"
 
 
 constexpr auto     METEORITE         = KnownMeteorites::ID::INNISFREE;
@@ -218,16 +219,21 @@ int main()
     std::cout << "     Meteoroids: " << STAGE2_N_TOP << " pcs" << std::endl;
     std::vector<std::pair<std::string, std::shared_ptr<IExporter>>> exporters
     {
-      std::make_pair(std::string("Represent meteoroid parameters as mean and standard deviation"),
+      std::make_pair(std::string("Represent meteoroids' parameters as mean and standard deviation"),
                      std::shared_ptr<IExporter>(new MeanStdevExporter(EXPORT_N_GROUPS))),
-      std::make_pair(std::string("Store trajectories as *.csv tables"),
+      std::make_pair(std::string("Store trajectories as tables"),
                      std::shared_ptr<IExporter>(new TrajectoryExporter(EXPORT_DT))),
     };
 #if defined(METEORITES_GNUPLOT)
     exporters.emplace_back
     (
-      std::make_pair(std::string("Visualize trajectories as *.png images"),
+      std::make_pair(std::string("Visualize trajectories as images"),
                      std::shared_ptr<IExporter>(new TrajectoryVisualizer(meteorite)))
+    );
+    exporters.emplace_back
+    (
+      std::make_pair(std::string("Save meteoroid parameter distributions as histograms"),
+                     std::shared_ptr<IExporter>(new HistogramBuilder(meteorite)))
     );
 #endif
 
