@@ -25,14 +25,14 @@ class KnownMeteorites
 
     // Simplified version that returns information about a predefined meteorite
     // Feel free to use it for testing and debugging purposes
-    const IMeteorite &Get(ID id) const;
+    const std::shared_ptr<const IMeteorite> &Get(ID id) const;
 
     // Queries all records about meteorites with the specified name AND the required DOI
     // Use an empty string if you accept any
     // In some cases, different records can describe the same meteorite
     // This means that the used information is taken from different sources (tables, DOIs, etc)
-    const std::vector<const IMeteorite *> Get(std::string name = std::string(),
-                                              std::string doi = std::string()) const;
+    const std::vector<std::shared_ptr<const IMeteorite>> Get(std::string name = std::string(),
+                                                         std::string doi = std::string()) const;
 
     // Returns names of all known meteorites (names are unique)
     const std::vector<std::string> &Names() const
@@ -48,7 +48,7 @@ class KnownMeteorites
   private:
     KnownMeteorites();
 
-    std::unordered_map<ID, const IMeteorite *> predefined_;
+    std::unordered_map<ID, std::shared_ptr<const IMeteorite>> predefined_;
     std::vector<std::string> names_, dois_;
-    std::vector<std::unique_ptr<IMeteorite>> collection_;
+    std::vector<std::shared_ptr<const IMeteorite>> collection_;
 };

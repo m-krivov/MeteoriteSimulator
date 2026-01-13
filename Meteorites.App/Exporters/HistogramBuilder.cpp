@@ -25,6 +25,7 @@ void PlotHistogram(const matplot::axes_handle &ax,
 
   hist->num_bins(15);
   ax->xlabel(caption);
+  //ax->xtickformat();
   ax->ylabel("Probability");
 }
 
@@ -38,7 +39,7 @@ void HistogramBuilder::Export(const std::vector<MeteoroidTrajectory> &trajectori
   assert(f);
 
   f->size(1500, 1500);
-  f->title(meteorite_.Name());
+  f->title(meteorite_->Name());
   {
     PlotHistogram(subplot(f, 3, 3, 0), "Density, g/cm^3", trajectories,
                   [](const MeteoroidTrajectory &tr) -> double { return tr.Meteoroid().Rho * 1e-3; });
@@ -49,15 +50,17 @@ void HistogramBuilder::Export(const std::vector<MeteoroidTrajectory> &trajectori
                   { return tr.Meteoroid().M0 / tr.Meteoroid().Rho * 1e3; });
 
     PlotHistogram(subplot(f, 3, 3, 3), "Entry angle, degrees", trajectories,
-                  [](const MeteoroidTrajectory &tr) -> double { return tr.Meteoroid().Gamma0 * 180.0 / M_PI; });
+                  [](const MeteoroidTrajectory &tr) -> double
+                  { return std::round(tr.Meteoroid().Gamma0 * 180.0 / M_PI * 10) / 10; });
     PlotHistogram(subplot(f, 3, 3, 4), "Residual mass, kg", trajectories,
-                  [](const MeteoroidTrajectory &tr) -> double { return tr.LastRecord().M; });
+                  [](const MeteoroidTrajectory &tr) -> double
+                  { return tr.Reason() == ISimulationRecorder::Reason::Burnt ? 0.0 : tr.LastRecord().M; });
     PlotHistogram(subplot(f, 3, 3, 5), "Flight distance, km", trajectories,
                   [](const MeteoroidTrajectory &tr) -> double { return tr.LastRecord().l * 1e-3; });
 
-     PlotHistogram(subplot(f, 3, 3, 6), "Braking coefficient (Cd)", trajectories,
+    PlotHistogram(subplot(f, 3, 3, 6), "Braking coefficient (Cd)", trajectories,
                   [](const MeteoroidTrajectory &tr) -> double { return tr.Meteoroid().Cd; });
-     PlotHistogram(subplot(f, 3, 3, 7), "Lift coefficient (Cl)", trajectories,
+    PlotHistogram(subplot(f, 3, 3, 7), "Lift coefficient (Cl)", trajectories,
                   [](const MeteoroidTrajectory &tr) -> double { return tr.Meteoroid().Cl; });
   }
   f->draw();

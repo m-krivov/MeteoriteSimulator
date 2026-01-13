@@ -96,7 +96,8 @@ void MeanStdevExporter::Export(const std::vector<MeteoroidTrajectory> &trajector
   std::vector<std::pair<std::string, std::function<real(const MeteoroidTrajectory &)>>> parameters =
   {
     { "Initial mass, kg", [](const MeteoroidTrajectory &m) -> real { return m.Meteoroid().M0; } },
-    { "Residual mass, kg", [](const MeteoroidTrajectory &m) -> real { return m.LastRecord().M; } },
+    { "Residual mass, kg", [](const MeteoroidTrajectory &m) -> real
+                           { return m.Reason() == ISimulationRecorder::Reason::Burnt ? 0.0 : m.LastRecord().M; } },
     { "Density, kg/m^3", [](const MeteoroidTrajectory &m) -> real { return m.Meteoroid().Rho; } },
     { "Flight distance, m", [](const MeteoroidTrajectory &m) -> real { return m.LastRecord().l; } },
     { "Entry angle, degrees", [](const MeteoroidTrajectory &m) -> real { return m.Meteoroid().Gamma0 * RAD_TO_DEG; } },

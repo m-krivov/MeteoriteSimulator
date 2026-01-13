@@ -140,10 +140,10 @@ int main()
   };
 
   // Print all available information about the simulated meteorite
-  std::cout << "Meteorite: " << meteorite.Name() << std::endl;
-  std::cout << "     Date: " << meteorite.Date() << std::endl;
-  std::cout << "     Fall: " << meteorite.FallLocation() << std::endl;
-  std::cout << "     DOI:  " << meteorite.DOI() << std::endl;
+  std::cout << "Meteorite: " << meteorite->Name() << std::endl;
+  std::cout << "     Date: " << meteorite->Date() << std::endl;
+  std::cout << "     Fall: " << meteorite->FallLocation() << std::endl;
+  std::cout << "     DOI:  " << meteorite->DOI() << std::endl;
   std::cout << std::endl;
 
   // For the first stage, we don't want to simulate meteorite flight till the end
@@ -152,7 +152,7 @@ int main()
   {
     size_t records;
     const real *time, *v, *h;
-    meteorite.Trajectory(records, time, v, h);
+    meteorite->Trajectory(records, time, v, h);
     t_end = time[records - 1];
   }
 
@@ -240,7 +240,7 @@ int main()
     for (const auto &rec : exporters)
     {
       rec.second->OnProgress(MyProgressSpinner::Create(std::string("     ") + rec.first), PROGRESS_BAR_STEP);
-      rec.second->SetDirectory(std::filesystem::current_path() / meteorite.Name());
+      rec.second->SetDirectory(std::filesystem::current_path() / meteorite->Name());
       rec.second->SetMetaData("now", meteorite); // TODO: use C++20 and 'date' to format the actual time
       rec.second->Export(stage2_trajectories);
       std::cout << std::endl;

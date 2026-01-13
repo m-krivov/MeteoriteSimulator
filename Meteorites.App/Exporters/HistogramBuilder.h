@@ -8,11 +8,11 @@ class HistogramBuilder : public BasicExporter
 {
   public:
     HistogramBuilder() = delete;
-    HistogramBuilder(const IMeteorite &meteorite) : meteorite_(meteorite) { }
+    HistogramBuilder(const std::shared_ptr<const IMeteorite> &meteorite) : meteorite_(meteorite) { }
 
     // The member of 'IExporter'
     virtual void Export(const std::vector<MeteoroidTrajectory> &trajectories) override final;
     
   private:
-    const IMeteorite &meteorite_;
+    const std::shared_ptr<const IMeteorite> &meteorite_;
 };

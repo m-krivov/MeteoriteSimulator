@@ -54,9 +54,9 @@ class Peekskill  : public BasicMeteorite
     }
 };
 
-void Populate(std::vector<std::unique_ptr<IMeteorite>> &records)
+void Populate(std::vector<std::shared_ptr<const IMeteorite>> &records)
 {
-  records.emplace_back(std::unique_ptr<IMeteorite>(new Peekskill()));
+  records.emplace_back(std::shared_ptr<const IMeteorite>(new Peekskill()));
 }
 
 } // namespace Beech1995

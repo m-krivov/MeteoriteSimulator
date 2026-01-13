@@ -14,7 +14,8 @@ class BasicExporter : public IExporter
     virtual void SetDirectory(const std::filesystem::path &directory) override final;
 
     // The member of 'IExporter'
-    virtual void SetMetaData(const std::string &date, const IMeteorite &meteorite) override final;
+    virtual void SetMetaData(const std::string &date,
+                             const std::shared_ptr<const IMeteorite> &meteorite) override final;
 
   protected:
     BasicExporter() = default;
@@ -30,7 +31,7 @@ class BasicExporter : public IExporter
   private:
     std::filesystem::path directory_;
     std::string date_;
-    std::optional<std::reference_wrapper<const IMeteorite>> meteorite_;
+    std::shared_ptr<const IMeteorite> meteorite_;
     std::function<void(float)> progress_callback_;
     float progress_step_{0.0f}, progress_threshold_{0.0f};
 };

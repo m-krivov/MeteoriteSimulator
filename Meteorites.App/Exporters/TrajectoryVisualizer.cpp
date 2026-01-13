@@ -250,7 +250,7 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
   {
     size_t n_records = 0;
     const real *tab_time = nullptr, *tab_velocity = nullptr, *tab_height = nullptr;
-    meteorite_.Trajectory(n_records, tab_time, tab_velocity, tab_height);
+    meteorite_->Trajectory(n_records, tab_time, tab_velocity, tab_height);
     assert(n_records > 0);
     t_end = tab_time[n_records - 1] * multiplier_;
     
@@ -312,7 +312,7 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
   assert(f);
 
   f->size(1200, 1200);
-  f->title(meteorite_.Name());
+  f->title(meteorite_->Name());
 
   {
     auto ax = subplot(f, 3, 2, 0);

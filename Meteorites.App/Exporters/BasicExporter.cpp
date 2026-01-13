@@ -20,16 +20,17 @@ void BasicExporter::SetDirectory(const std::filesystem::path &directory)
   }
 }
 
-void BasicExporter::SetMetaData(const std::string &date, const IMeteorite &meteorite)
+void BasicExporter::SetMetaData(const std::string &date,
+                                const std::shared_ptr<const IMeteorite> &meteorite)
 {
   date_      = date;
-  meteorite_.emplace(meteorite);
+  meteorite_ = meteorite;
 }
 
 const IMeteorite &BasicExporter::Meteorite() const
 {
-  assert(meteorite_.has_value());
-  return meteorite_.value().get();
+  assert(meteorite_ != nullptr);
+  return *meteorite_;
 }
 
 void BasicExporter::UpdateProgress(size_t current, size_t total)

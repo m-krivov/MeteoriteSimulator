@@ -8,7 +8,7 @@
 class L2Functional : public BasicFunctional
 {
   public:
-    L2Functional(const IMeteorite &meteorite,
+    L2Functional(const std::shared_ptr<const IMeteorite> &meteorite,
                  real lambda_v = (real)1.0,
                  real lambda_h = (real)1.0)
       : BasicFunctional(meteorite, lambda_v, lambda_h)
