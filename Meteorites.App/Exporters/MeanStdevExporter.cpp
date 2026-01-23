@@ -107,7 +107,7 @@ void MeanStdevExporter::Export(const std::vector<MeteoroidTrajectory> &trajector
     { "Heat transfer coefficient", [](const MeteoroidTrajectory &m) -> real { return m.Meteoroid().Ch; } }
   };
 
-  // In addition, classify meteoroids by the reason why simulation was ended
+  // In addition, classify meteoroids by reason why the simulation was ended
   parameters.push_back
   ({
     "Probability of combustion, %", [](const MeteoroidTrajectory &m) -> real
