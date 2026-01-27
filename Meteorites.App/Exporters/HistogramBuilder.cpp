@@ -79,7 +79,6 @@ void PlotHistogram(const std::string &caption,
 
   // Additionally, save these data to a CSV file
   decltype(auto) bins = hist->values();
-  std::cout << bins.size() << " vs " << tick_positions.size() << std::endl;
   assert(tick_positions.size() == bins.size() + 1);
   
   csv << caption << ";probability" << std::endl;

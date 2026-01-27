@@ -13,32 +13,260 @@ matplot::vector_2d ToColor(const std::array<double, 3> &color)
   return matplot::vector_2d { { color[0], color[1], color[2] } };
 };
 
-// Contains data for visualization h(t), V(t) and M(t)
-struct TimeDependentTrajectories
+void Average(const std::vector<double> &arguments,
+             const std::vector<std::vector<double>> &values,
+             std::vector<double> &average)
 {
-  std::vector<double> times;
+  average.resize(arguments.size(), 0.0);
+  std::vector<size_t> count(arguments.size(), 0);
+  for (const auto &v : values)
+  {
+    for (size_t i = 0; i < v.size(); i++)
+    {
+      average[i] += v[i];
+      count[i]++;
+    }
+  }
+  for (size_t i = 0; i < average.size(); i++)
+  {
+    if (count[i] == 0)
+    {
+      average.resize(i);
+      break;
+    }
+    average[i] /= count[i];
+  }
+}
+
+// Partially vibe-coded by DeepSeek
+void Average(const std::vector<std::vector<double>> &arguments,
+             const std::vector<std::vector<double>> &values,
+             const std::vector<double> &average_arguments,
+             std::vector<double> &average_values)
+{
+  assert(arguments.size() == values.size());
+  
+  // Number of sample points for the mean trajectory
+  const size_t n_points = 200;
+  std::vector<double> sampled_arguments(n_points, 0.0);
+  std::vector<double> sampled_values(n_points, 0.0);
+  std::vector<size_t> counts(n_points, 0);
+  
+  // For each trajectory, sample it using normalized progress points
+  for (size_t j = 0; j < arguments.size(); j++)
+  {
+    const auto &cur_arguments = arguments[j];
+    const auto &cur_values    = values[j];
+    if (cur_arguments.size() < 2) continue;
+    
+    // Sample this trajectory at normalized progress [0, 1]
+    for (size_t i = 0; i < n_points; i++)
+    {
+      double target_distance = (cur_arguments.back() * i) / (n_points - 1);
+      
+      // Find segment containing target_distance
+      auto it = std::lower_bound(cur_arguments.begin(), cur_arguments.end(), target_distance);
+      size_t seg_idx = (it == cur_arguments.begin()) ? 0 : std::distance(cur_arguments.begin(), it) - 1;
+      
+      if (seg_idx + 1 >= cur_arguments.size())
+      {
+        sampled_arguments[i] += cur_arguments.back();
+        sampled_values[i] += cur_values.back();
+        counts[i]++;
+        break;
+      }
+      
+      // Linear interpolation within segment
+      double d1 = cur_arguments[seg_idx];
+      double d2 = cur_arguments[seg_idx + 1];
+      double h1 = cur_values[seg_idx];
+      double h2 = cur_values[seg_idx + 1];
+      
+      if (std::abs(d2 - d1) > std::numeric_limits<double>::epsilon() * 10)
+      {
+        double t = (target_distance - d1) / (d2 - d1);
+        double interpolated = h1 + t * (h2 - h1);
+        
+        sampled_arguments[i] += target_distance;
+        sampled_values[i] += interpolated;
+        counts[i]++;
+      }
+      else
+      {
+        sampled_arguments[i] += d1;
+        sampled_values[i] += h1;
+        counts[i]++;
+      }
+    }
+  }
+  
+  // Calculate the mean values and create the mean trajectory
+  for (size_t i = 0; i < n_points; i++)
+  {
+    if (counts[i] > 0)
+    {
+      sampled_arguments[i] /= counts[i];
+      sampled_values[i] /= counts[i];
+    }
+  }
+
+  // Finally, map sampled averages to the requested arguments
+  average_values.clear();
+  average_values.reserve(average_arguments.size());
+  
+  for (size_t i = 0; i < average_arguments.size(); i++)
+  {
+    double target_arg = average_arguments[i];
+    
+    size_t seg_idx = 0;
+    while (seg_idx + 1 < n_points && sampled_arguments[seg_idx + 1] < target_arg)
+    { seg_idx++; }
+    
+    //  Just interrupt average trajectory if the requested arguments do not match it
+    if (seg_idx + 1 >= n_points)
+    { break; }
+    
+    if (target_arg <= sampled_arguments[0])
+    {
+      average_values.push_back(sampled_values[0]);
+      continue;
+    }
+    
+    // Linear interpolation
+    double d1 = sampled_arguments[seg_idx];
+    double d2 = sampled_arguments[seg_idx + 1];
+    double h1 = sampled_values[seg_idx];
+    double h2 = sampled_values[seg_idx + 1];
+    
+    if (std::abs(d2 - d1) > std::numeric_limits<double>::epsilon() * 10)
+    {
+      double t = (target_arg - d1) / (d2 - d1);
+      double interpolated = h1 + t * (h2 - h1);
+      average_values.push_back(interpolated);
+    }
+    else
+    {
+      average_values.push_back(h1);
+    }
+  }
+}
+
+// Partially vibe-coded by DeepSeek
+void Resample(const std::vector<std::vector<double>> &arguments,
+              const std::vector<std::vector<double>> &values,
+              std::vector<double> &resampled_arguments,
+              std::vector<std::vector<double>> &resampled_values)
+{
+  assert(arguments.size() == values.size());
+  if (arguments.empty() || values.empty())
+  { return; }
+
+  // Step 1: Find the global maximum across all arguments
+  double max_arg = std::numeric_limits<double>::lowest();  
+  for (const auto &r : arguments)
+  {
+    if (r.empty())
+    { continue; }
+    
+    assert(r[0] == 0.0);
+    max_arg = std::max(max_arg, r.back());
+  }
+
+  // Step 2: Create unified vector with arguments
+  // Use the maximum number of points from all trajectories
+  {
+    size_t max_points = 0;
+    for (const auto &r : arguments)
+    { max_points = std::max(max_points, r.size()); }
+    
+    resampled_arguments.reserve(max_points);
+    double step = max_arg / (max_points - 1);
+    for (size_t i = 0; i < max_points; ++i)
+    { resampled_arguments.push_back(i * step); }
+  }
+
+  // Step 3: Resample arguments and values
+  for (size_t i = 0; i < arguments.size(); i++)
+  {
+    const auto &cur_arguments = arguments[i];
+    const auto &cur_values = values[i];
+    assert(cur_arguments.size() == cur_values.size());
+    
+    std::vector<double> cur_resampled_values;
+    cur_resampled_values.reserve(values.size());
+    
+    for (double arg : resampled_arguments)
+    {
+      auto it = std::lower_bound(cur_arguments.begin(), cur_arguments.end(), arg);
+      if (it == cur_arguments.end())
+      { break; }
+      
+      if (it != cur_arguments.begin())
+      {
+        size_t idx = std::distance(cur_arguments.begin(), it);
+        double prev_arg = cur_arguments[idx - 1];
+        double next_arg = cur_arguments[idx];
+        double prev_val = cur_values[idx - 1];
+        double next_val = cur_values[idx];
+
+        if (std::abs(next_arg - prev_arg) <= std::numeric_limits<double>::epsilon() * 10)
+        { cur_resampled_values.push_back(prev_val); }
+        else
+        {
+          double t = (arg - prev_arg) / (next_arg - prev_arg);
+          double interpolated = prev_val + t * (next_val - prev_val);
+          cur_resampled_values.push_back(interpolated);
+        }
+      }
+      else
+      { cur_resampled_values.push_back(cur_values.front()); }
+    }
+    resampled_values.emplace_back(std::move(cur_resampled_values));
+  }
+}
+
+// Contains data for visualization h(t), V(t), M(t) and h(l)
+struct VisualizationData
+{
+  std::vector<double> arguments;
   std::vector<std::vector<double>> values;
+  std::vector<double> average;
   std::vector<std::pair<double, double>> points;
 
-  std::array<double, 3> line_color{ 0.75, 0.75, 0.75 };
+  std::array<double, 3> value_color{ 0.75, 0.75, 0.75 };
   std::array<double, 3> average_color{ 0.19, 0.18, 0.17 };
   std::array<double, 3> point_color{ 0.82, 0.32, 0.13 };
 
   float average_width{ 1.5f };
   size_t point_size{ 4 };
   
-  TimeDependentTrajectories(const std::vector<double> &times_,
-                            std::vector<std::vector<double>> &&values_,
-                            std::vector<std::pair<double, double>> &&points_)
-    : times(times_), values(std::move(values_)), points(std::move(points_))
-  { }
-  TimeDependentTrajectories(const TimeDependentTrajectories &) = delete;
-  TimeDependentTrajectories(TimeDependentTrajectories &&) = delete;
+  // Version for h(t), V(t), M(t)
+  VisualizationData(const std::vector<double> &arguments_,
+                    std::vector<std::vector<double>> &&values_,
+                    std::vector<std::pair<double, double>> &&points_)
+    : arguments(arguments_), values(std::move(values_)), points(std::move(points_))
+  {
+    Average(arguments, values, average);
+  }
+
+  // Version for h(l)
+  VisualizationData(const std::vector<std::vector<double>> &arguments_,
+                    const std::vector<std::vector<double>> &values_,
+                    std::vector<std::pair<double, double>> &&points_)
+    : points(std::move(points_))
+  {
+    Resample(arguments_, values_, arguments, values);
+    Average(arguments_, values_, arguments, average);
+  }
+
+  VisualizationData(const VisualizationData &) = delete;
+  VisualizationData(VisualizationData &&) = delete;
 };
 
-void Visualize(const matplot::axes_handle &ax, const TimeDependentTrajectories &tr)
+void Visualize(const matplot::axes_handle &ax,
+               const VisualizationData &tr)
 {
-  assert(!tr.times.empty());
+  assert(!tr.arguments.empty());
   assert(!tr.values.empty());
   assert(!tr.values[0].empty());
 
@@ -46,33 +274,14 @@ void Visualize(const matplot::axes_handle &ax, const TimeDependentTrajectories &
   grid(ax, on);
 
   // The original trajectories
-  colororder(ax, ToColor(tr.line_color));
-  plot(ax, tr.times, tr.values);
+  colororder(ax, ToColor(tr.value_color));
+  plot(ax, tr.arguments, tr.values);
 
   // Average trajectory
   {
-    std::vector<double> average(tr.times.size(), 0.0);
-    std::vector<size_t> count(tr.times.size(), 0);
-    for (const auto &v : tr.values)
-    {
-      for (size_t i = 0; i < v.size(); i++)
-      {
-        average[i] += v[i];
-        count[i]++;
-      }
-    }
-    for (size_t i = 0; i < average.size(); i++)
-    {
-      if (count[i] == 0)
-      {
-        average.resize(i);
-        break;
-      }
-      average[i] /= count[i];
-    }
     hold(ax, on);
     colororder(ax, ToColor(tr.average_color));
-    auto l = plot(ax, tr.times, { std::move(average) });
+    auto l = plot(ax, tr.arguments, { tr.average });
     l->line_width(tr.average_width);
     l->line_style("-");
     hold(ax, off);
@@ -95,146 +304,48 @@ void Visualize(const matplot::axes_handle &ax, const TimeDependentTrajectories &
   }
 }
 
-// More traditional trajectories that represent height-distance dependencies
-struct DistanceHeightTrajectories
+void Store(const std::filesystem::path &filename,
+           const VisualizationData &tr)
 {
-  std::vector<std::vector<double>> distances;
-  std::vector<std::vector<double>> heights;
+  std::ofstream f(filename);
 
-  std::array<double, 3> line_color{ 0.75, 0.75, 0.75 };
-  std::array<double, 3> average_color{ 0.19, 0.18, 0.17 };
-  float average_width{ 1.5f };
+  // Titles
+  f << "Argument;Mean;";
+  for (size_t i = 0; i < tr.values.size(); i++)
+  { f << "Value #" << i << ';'; }
+  f << "Reference value" << std::endl;
 
-  DistanceHeightTrajectories(std::vector<std::vector<double>> &&distances_,
-                             std::vector<std::vector<double>> &&heights_)
-    : distances(std::move(distances_)), heights(std::move(heights_))
-  { }
-  DistanceHeightTrajectories(const DistanceHeightTrajectories &) = delete;
-  DistanceHeightTrajectories(DistanceHeightTrajectories &&) = delete;
-};
-
-void Visualize(const matplot::axes_handle &ax, const DistanceHeightTrajectories &tr)
-{
-  assert(tr.distances.size() > 1);   // for interpolation
-  assert(tr.distances.size() == tr.heights.size());
-
-  using namespace matplot;
-  grid(ax, on);
-  hold(ax, on);
-
-  // Visualize individual trajectories
-  colororder(ax, ToColor(tr.line_color));
-
-  for (size_t i = 0; i < tr.distances.size(); i++)
+  // Values themselves
+  size_t next_point = 0;
+  for (size_t i = 0; i < tr.arguments.size(); i++)
   {
-    const auto &d = tr.distances[i];
-    const auto &h = tr.heights[i];
-    assert(!d.empty());
-    assert(d.size() == h.size());
-    plot(ax, d, h);
+    f << tr.arguments[i] << ';';
+    if (i < tr.average.size())
+    { f << tr.average[i]; }
+    f << ';';
+
+    for (const auto &value : tr.values)
+    {
+      if (i < value.size())
+      { f << value[i]; }
+      f << ';';
+    }
+
+    if (next_point < tr.points.size() && tr.arguments[i] >= tr.points[next_point].first)
+    {
+      f << tr.points[next_point].second;
+      next_point += 1;
+    }
+    f << ';' << std::endl;
   }
 
-  // Vibe-coded by DeepSeek
+  // Final check
+  if (!f.good())
   {
-    // First, find the maximum total distance across all trajectories
-    double max_total_distance = 0.0;
-    for (const auto &d_vec : tr.distances)
-    {
-      if (!d_vec.empty())
-      {
-        max_total_distance = std::max(max_total_distance, d_vec.back());
-      }
-    }
-    
-    // Number of sample points for the mean trajectory
-    const size_t num_mean_points = 200;
-    std::vector<double> mean_distances(num_mean_points, 0.0);
-    std::vector<double> mean_heights(num_mean_points, 0.0);
-    std::vector<size_t> mean_counts(num_mean_points, 0);
-    
-    // For each trajectory, sample at normalized progress points
-    for (size_t traj_idx = 0; traj_idx < tr.distances.size(); traj_idx++)
-    {
-      const auto &dist_vec = tr.distances[traj_idx];
-      const auto &height_vec = tr.heights[traj_idx];
-      
-      if (dist_vec.size() < 2) continue;
-      
-      double traj_total_distance = dist_vec.back();
-      
-      // Sample this trajectory at normalized progress [0, 1]
-      for (size_t i = 0; i < num_mean_points; i++)
-      {
-        double progress = static_cast<double>(i) / (num_mean_points - 1);
-        
-        // Scale progress by this trajectory's total distance
-        double target_distance = progress * traj_total_distance;
-        
-        // Find segment containing target_distance
-        size_t seg_idx = 0;
-        while (seg_idx + 1 < dist_vec.size() && dist_vec[seg_idx + 1] < target_distance)
-        {
-          seg_idx++;
-        }
-        
-        if (seg_idx + 1 >= dist_vec.size())
-        {
-          // Use last point if we're beyond the trajectory
-          mean_distances[i] += dist_vec.back();
-          mean_heights[i] += height_vec.back();
-          mean_counts[i]++;
-          break;
-        }
-        
-        // Linear interpolation within segment
-        double d1 = dist_vec[seg_idx];
-        double d2 = dist_vec[seg_idx + 1];
-        double h1 = height_vec[seg_idx];
-        double h2 = height_vec[seg_idx + 1];
-        
-        if (std::abs(d2 - d1) > std::numeric_limits<double>::epsilon())
-        {
-          double t = (target_distance - d1) / (d2 - d1);
-          double interpolated_height = h1 + t * (h2 - h1);
-          
-          mean_distances[i] += target_distance;  // Use the target distance
-          mean_heights[i] += interpolated_height;
-          mean_counts[i]++;
-        }
-        else
-        {
-          // Zero-length segment, use the point
-          mean_distances[i] += d1;
-          mean_heights[i] += h1;
-          mean_counts[i]++;
-        }
-      }
-    }
-    
-    // Calculate the mean values and create the mean trajectory
-    std::vector<double> final_mean_distances;
-    std::vector<double> final_mean_heights;
-    
-    for (size_t i = 0; i < num_mean_points; i++)
-    {
-      if (mean_counts[i] > 0)
-      {
-        final_mean_distances.push_back(mean_distances[i] / mean_counts[i]);
-        final_mean_heights.push_back(mean_heights[i] / mean_counts[i]);
-      }
-    }
-    
-    // Plot the mean trajectory
-    if (!final_mean_distances.empty() && final_mean_distances.size() > 1)
-    {
-      colororder(ax, ToColor(tr.average_color));
-      auto mean_line = plot(ax, final_mean_distances, final_mean_heights);
-      mean_line->line_width(tr.average_width);
-      mean_line->line_style("-");
-    }
+    std::ostringstream oss;
+    oss << "Failed to create file '" << filename << "'";
+    throw std::runtime_error(oss.str());
   }
-
-  hold(ax, off);
 }
 
 } // unnamed namespace
@@ -321,10 +432,11 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
     xlim(ax, { 0.0, t_end });
     ylabel(ax, "Velocity, km/s");
 
-    TimeDependentTrajectories tr(time_axis,
-                                 std::move(tr_partial_velocity),
-                                 std::move(ref_velocity));
+    VisualizationData tr(time_axis,
+                         std::move(tr_partial_velocity),
+                         std::move(ref_velocity));
     Visualize(ax, tr);
+    Store(Directory() / "trajectories_velocity.csv", tr);
   }
   UpdateProgress(1, 4);
 
@@ -335,10 +447,11 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
     xlim(ax, { 0.0, t_end });
     ylabel(ax, "Height, km");
 
-    TimeDependentTrajectories tr(time_axis,
-                                 std::move(tr_partial_height),
-                                 std::move(ref_height));
+    VisualizationData tr(time_axis,
+                         std::move(tr_partial_height),
+                         std::move(ref_height));
     Visualize(ax, tr);
+    Store(Directory() / "trajectories_height.csv", tr);
   }
   UpdateProgress(2, 4);
 
@@ -349,8 +462,9 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
     xlim(ax, { 0.0, t_end });
     ylabel(ax, "Mass, kg");
 
-    TimeDependentTrajectories tr(time_axis, std::move(tr_partial_mass), {});
+    VisualizationData tr(time_axis, std::move(tr_partial_mass), {});
     Visualize(ax, tr);
+    Store(Directory() / "trajectories_mass.csv", tr);
   }
   UpdateProgress(3, 4);
   
@@ -359,9 +473,9 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
     assert(ax);
     xlabel(ax, "Distance, km");
     ylabel(ax, "Height, km");
-    DistanceHeightTrajectories tr(std::move(tr_full_distance),
-                                  std::move(tr_full_height));
+    VisualizationData tr(tr_full_distance, tr_full_height, {});
     Visualize(ax, tr);
+    Store(Directory() / "trajectories_distance.csv", tr);
   }
   UpdateProgress(4, 4);
 
