@@ -2,6 +2,7 @@
 
 #include "KnownMeteorites/1981_Halliday.h"
 #include "KnownMeteorites/1995_Beech.h"
+#include "KnownMeteorites/1996_Halliday.h"
 #include "KnownMeteorites/2008_Gritsevich.h"
 #include "KnownMeteorites/2013_Borovicka.h"
 #include "KnownMeteorites/2017_Gritsevich.h"
@@ -11,6 +12,7 @@ KnownMeteorites::KnownMeteorites()
   // Populate the collection with known meteorites
   Halliday1981::Populate(collection_);
   Beech1995::Populate(collection_);
+  Halliday1996::Populate(collection_);
   Gritsevich2008::Populate(collection_);
   Borovicka2013::Populate(collection_);
   Gritsevich2017::Populate(collection_);
@@ -59,17 +61,16 @@ KnownMeteorites::KnownMeteorites()
   }
 }
 
-const IMeteorite &KnownMeteorites::Get(ID id) const
+const std::shared_ptr<const IMeteorite> &KnownMeteorites::Get(ID id) const
 {
   auto iter = predefined_.find(id);
   assert(iter != predefined_.end());
-  assert(iter->second != nullptr);
-  return *iter->second;
+  return iter->second;
 }
 
-const std::vector<const IMeteorite *> KnownMeteorites::Get(std::string name, std::string doi) const
+const std::vector<std::shared_ptr<const IMeteorite>> KnownMeteorites::Get(std::string name, std::string doi) const
 {
-  std::vector<const IMeteorite *> result;
+  std::vector<std::shared_ptr<const IMeteorite>> result;
   for (const auto &meteorite : collection_)
   {
     bool name_is_ok = name.empty() || meteorite->Name() == name;

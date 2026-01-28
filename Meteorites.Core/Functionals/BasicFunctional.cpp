@@ -1,6 +1,7 @@
 #include "BasicFunctional.h"
 
-BasicFunctional::BasicFunctional(const IMeteorite &meteorite, real lambda_v, real lambda_h)
+BasicFunctional::BasicFunctional(const std::shared_ptr<const IMeteorite> &meteorite,
+                                 real lambda_v, real lambda_h)
   : lambda_h_(lambda_h), lambda_v_(lambda_v)
 {
   assert(lambda_h >= 0.0);
@@ -8,7 +9,7 @@ BasicFunctional::BasicFunctional(const IMeteorite &meteorite, real lambda_v, rea
 
   size_t records = 0;
   const real *time = nullptr, *v = nullptr, *h = nullptr;
-  meteorite.Trajectory(records, time, v, h);
+  meteorite->Trajectory(records, time, v, h);
   assert(records != 0);
   assert(time != nullptr);
   assert(v != nullptr);
