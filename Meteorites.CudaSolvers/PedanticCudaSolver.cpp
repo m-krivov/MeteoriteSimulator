@@ -146,6 +146,7 @@ void BatchedAdams(const std::vector<VirtualMeteoroid> &problems, real dt, real t
                               dev_timestamps, n_timestamps,
                               dev_functional_args, dev_records + iter * half_records_size,
                               iterations_per_batch, threads_per_block, streams[iter]);
+    HANDLE_ERROR(cudaEventRecord(kernel_events[iter], streams[iter]));
     HANDLE_ERROR(cudaMemcpyAsync(records_buffers[iter],
                                  dev_records + iter * half_records_size,
                                  half_records_size * sizeof(Record),
@@ -160,6 +161,7 @@ void BatchedAdams(const std::vector<VirtualMeteoroid> &problems, real dt, real t
       iter = !iter;
 
       HANDLE_ERROR(cudaStreamWaitEvent(streams[iter], copy_events[iter]));
+      HANDLE_ERROR(cudaStreamWaitEvent(streams[iter], kernel_events[!iter]));
       BatchedAdamsKernel<STEPS>(dev_contexts, dev_active_meteorites,
                                 dev_problems, n_meteorites, dt, timeout,
                                 dev_timestamps, n_timestamps,

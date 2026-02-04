@@ -16,7 +16,7 @@ struct alignas(32) Record
   Record &operator =(const Record &) = default;
 
 #if !defined(NDEBUG)
-  void Print()
+  void Print() const
   {
     printf("Record: {t=%f, M=%f, V=%f, h=%f, l=%f, Gamma=%f\n",
            (float)t, (float)M, (float)V, (float)h, (float)l, Gamma);
