@@ -23,7 +23,7 @@ class IExporter
 
     // Sets optional metadata about the exporting data, such as the date of simulation and the meteorite information
     virtual void SetMetaData(const std::string &date,
-                             const IMeteorite &meteorite) = 0;
+                             const std::shared_ptr<const IMeteorite> &meteorite) = 0;
 
     // Processes the provided meteoroid trajectories and stores them in the requested directory
     virtual void Export(const std::vector<MeteoroidTrajectory> &trajectories) = 0;

@@ -71,10 +71,10 @@ class LostCity : public BasicMeteorite
     }
 };
 
-void Populate(std::vector<std::unique_ptr<IMeteorite>> &records)
+void Populate(std::vector<std::shared_ptr<const IMeteorite>> &records)
 {
-  records.emplace_back(std::unique_ptr<IMeteorite>(new Pribram()));
-  records.emplace_back(std::unique_ptr<IMeteorite>(new LostCity()));
+  records.emplace_back(std::shared_ptr<const IMeteorite>(new Pribram()));
+  records.emplace_back(std::shared_ptr<const IMeteorite>(new LostCity()));
 }
 
 } // namespace Gritsevich2008

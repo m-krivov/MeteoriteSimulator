@@ -9,7 +9,7 @@
 class MonteCarloGenerator : public BasicMeteoroidGenerator
 {
   public:
-    MonteCarloGenerator(const IMeteorite &meteorite,
+    MonteCarloGenerator(const std::shared_ptr<const IMeteorite> &meteorite,
                         const ParameterSet &range,
                         size_t n_cases, uint64_t seed);
 

@@ -13,7 +13,7 @@ class BasicFunctional : public IFunctional
     virtual void GetTimeStamps(size_t &num, const real *&values) const override final;
 
   protected:
-    BasicFunctional(const IMeteorite &meteorite,
+    BasicFunctional(const std::shared_ptr<const IMeteorite> &meteorite,
                     real lambda_v, real lambda_h);
 
     real LambdaV() const { return lambda_v_; }

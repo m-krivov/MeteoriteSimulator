@@ -1,7 +1,7 @@
 #include "MonteCarloGenerator.h"
 
 
-MonteCarloGenerator::MonteCarloGenerator(const IMeteorite &meteorite,
+MonteCarloGenerator::MonteCarloGenerator(const std::shared_ptr<const IMeteorite> &meteorite,
                                          const ParameterSet &range,
                                          size_t n_cases, uint64_t seed)
   : gen_(seed), dist_((real)0.0f, (real)1.0f),
@@ -11,7 +11,7 @@ MonteCarloGenerator::MonteCarloGenerator(const IMeteorite &meteorite,
   
   size_t records = 0;
   const real *time, *v, *h;
-  meteorite.Trajectory(records, time, v, h);
+  meteorite->Trajectory(records, time, v, h);
   assert(records >= 2);
   assert(v[0] > (real)0.0f);
   assert(time[0] == 0.0f);

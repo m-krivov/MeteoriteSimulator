@@ -9,7 +9,7 @@ int main()
 {
   size_t points = 0;
   const real *t = nullptr, *v = nullptr, *h = nullptr;
-  KnownMeteorites::Ref().Get(KnownMeteorites::ID::INNISFREE).Trajectory(points, t, v, h);
+  KnownMeteorites::Ref().Get(KnownMeteorites::ID::INNISFREE)->Trajectory(points, t, v, h);
   assert(points > 0);
 
   decltype(auto) params = PossibleParameters::Get(Distribution::UNIFORM_ANY);

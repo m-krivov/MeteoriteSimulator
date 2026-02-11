@@ -1,4 +1,5 @@
 Bin
-3rdParty
+DepCache
 build
 .vscode
+.continue
