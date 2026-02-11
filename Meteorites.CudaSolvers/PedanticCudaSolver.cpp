@@ -1,4 +1,4 @@
-#include "LinearAllocator.h"
+#include "IterationAllocator.h"
 #include "PedanticCudaSolver.h"
 
 #include "BatchedAdamsKernel.h"
@@ -10,7 +10,7 @@
 namespace
 {
 
-using CpuAllocator = LinearAllocator<Record>;
+using UniquePtr = std::unique_ptr<Record, IterationAllocator::Deleter>;
 
 // Simulation results are stored in some slice-based format
 // This helper allows us to traverse them
@@ -21,7 +21,7 @@ class Enumerator
     Enumerator(const Enumerator &) = delete;
     Enumerator &operator =(const Enumerator &) = delete;
 
-    Enumerator(const std::vector<CpuAllocator::UniquePtr> &blocks,
+    Enumerator(const std::vector<UniquePtr> &blocks,
                size_t meteorites_per_block, size_t iterations_per_block,
                size_t meteorite_idx)
       : iterations_per_block_(iterations_per_block), meteorite_idx_(meteorite_idx),
@@ -62,7 +62,7 @@ class Enumerator
     const size_t iterations_per_block_{}, meteorite_idx_{};
     size_t block_{}, iteration_{};
     bool finished_{};
-    const std::vector<CpuAllocator::UniquePtr> &blocks_;
+    const std::vector<UniquePtr> &blocks_;
 };
 
 
@@ -108,7 +108,7 @@ void BatchedAdams(const std::vector<VirtualMeteoroid> &problems, real dt, real t
     });
   };
 
-  CpuAllocator allocator;
+  IterationAllocator allocator;
 
   // Cache timestamps, they are the same for all meteorites
   const real *timestamps = nullptr;
@@ -136,7 +136,7 @@ void BatchedAdams(const std::vector<VirtualMeteoroid> &problems, real dt, real t
     HANDLE_ERROR(cudaMemcpy(dev_problems, problems.data() + batch * batch_size,
                             sizeof(VirtualMeteoroid) * n_meteorites, cudaMemcpyHostToDevice));
 
-    std::vector<CpuAllocator::UniquePtr> records;
+    std::vector<UniquePtr> records;
 
     // Init step of conveyor
     int iter = 0;
@@ -173,7 +173,7 @@ void BatchedAdams(const std::vector<VirtualMeteoroid> &problems, real dt, real t
       HANDLE_ERROR(cudaEventSynchronize(copy_events[!iter]));
       HANDLE_ERROR(cudaEventSynchronize(kernel_events[iter]));
 
-      records.emplace_back(allocator.Alloc(half_records_size));
+      records.emplace_back(allocator.Alloc<Record>(half_records_size));
       futures[!iter] = memcpy_async(!iter, records.back().get());
       HANDLE_ERROR(cudaMemcpy(&active_meteorites, dev_active_meteorites,
                               sizeof(int32_t), cudaMemcpyDeviceToHost));
@@ -191,7 +191,7 @@ void BatchedAdams(const std::vector<VirtualMeteoroid> &problems, real dt, real t
     futures[iter].wait();
     HANDLE_ERROR(cudaEventSynchronize(copy_events[!iter]));
 
-    records.emplace_back(allocator.Alloc(half_records_size));
+    records.emplace_back(allocator.Alloc<Record>(half_records_size));
     futures[!iter] = memcpy_async(!iter, records.back().get());
     futures[!iter].wait();
 
