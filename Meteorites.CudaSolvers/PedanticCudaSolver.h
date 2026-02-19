@@ -31,26 +31,22 @@ class PedanticCudaSolver : public BasicSolver
     PedanticCudaSolver(PedanticCudaSolverConfig config = PedanticCudaSolverConfig());
     virtual ~PedanticCudaSolver();
 
-    // ISolver method
-    virtual void Solve(const VirtualMeteoroid &problem,
-                       const IFunctional &functional,
-                       ISimulationRecorder &results) override final;
-
-    // ISolver method
-    virtual void Solve(const std::vector<VirtualMeteoroid> &problems,
-                       const IFunctional &functional,
-                       ISimulationRecorder &results) override final;
-
-    // ISolver method
-    virtual void Solve(IMeteoroidGenerator &generator,
-                       const IFunctional &functional,
-                       ISimulationRecorder &results) override final;
   private:
+    // BasicSolver method
     // How many meteorites must be simulated at one time
-    size_t BatchSize() const;
+    virtual size_t BatchSize() const override final;
+
+    virtual void SolveAny(MeteoroidEnumerator &enumerator,
+                          const IFunctional &functional,
+                          ISimulationRecorder &results) override final;
 
     cudaDeviceProp props_{};
     const PedanticCudaSolverConfig config_{};
+
+    std::array<cudaStream_t, 2> streams_;
+    std::array<cudaEvent_t, 2> copy_events_;
+    std::array<cudaEvent_t, 2> kernel_events_;
+    std::array<uint8_t *, 2> pinned_buffers_;
 
     CudaPtr<uint8_t> buffer_counter_;
     CudaPtr<uint8_t> buffer_problems_;

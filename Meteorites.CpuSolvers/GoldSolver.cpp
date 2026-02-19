@@ -102,23 +102,35 @@ void AdamsMethod(const VirtualMeteoroid &problem, const IFunctional &functional,
 } // unnamed namespace
 
 
-void GoldSolver::Solve(const VirtualMeteoroid &problem, const IFunctional &functional, ISimulationRecorder &results)
+void GoldSolver::SolveAny(MeteoroidEnumerator &problems,
+                          const IFunctional &functional,
+                          ISimulationRecorder &results)
 {
+  auto method = AdamsMethod<1>;
   switch (Algorithm())
   {
     case NumericalAlgorithm::ONE_STEP_ADAMS:
-      AdamsMethod<1>(problem, functional, Dt(), Timeout(), results);
+      method = AdamsMethod<1>;
       break;
 
     case NumericalAlgorithm::TWO_STEP_ADAMS:
-      AdamsMethod<2>(problem, functional, Dt(), Timeout(), results);
+      method = AdamsMethod<2>;
       break;
 
     case NumericalAlgorithm::THREE_STEP_ADAMS:
-      AdamsMethod<3>(problem, functional, Dt(), Timeout(), results);
+      method = AdamsMethod<3>;
       break;
 
     default:
       throw std::runtime_error("unknown numerical algorithm");
+  }
+
+  const VirtualMeteoroid *meteoroid = nullptr;
+  size_t size = 0;
+  while (problems.MoveNext(meteoroid, size))
+  {
+    assert(size == 1);
+    assert(meteoroid != nullptr);
+    method(*meteoroid, functional, Dt(), Timeout(), results);
   }
 }

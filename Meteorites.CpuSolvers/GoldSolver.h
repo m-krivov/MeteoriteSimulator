@@ -11,8 +11,12 @@ class GoldSolver : public BasicSolver
   public:
     GoldSolver() = default;
 
-    // ISolver method
-    virtual void Solve(const VirtualMeteoroid &problem,
-                       const IFunctional &functional,
-                       ISimulationRecorder &results) override final;
+  protected:
+    // BasicSolver method
+    virtual size_t BatchSize() const override final { return 1; }
+
+    // BasicSolver method
+    virtual void SolveAny(MeteoroidEnumerator &problems,
+                          const IFunctional &functional,
+                          ISimulationRecorder &results) override final;
 };
