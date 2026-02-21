@@ -13,7 +13,7 @@ namespace
 using UniquePtr = std::unique_ptr<Record, IterationAllocator::Deleter>;
 
 // Simulation results (trajectories) are stored in some slice-based format
-// This helper allows us to traverse them
+// This helper allows us to traverse them and distinguish records that corresponds to timestamps
 class TrajectoryEnumerator
 {
   public:
@@ -21,10 +21,12 @@ class TrajectoryEnumerator
     TrajectoryEnumerator(const TrajectoryEnumerator &) = delete;
     TrajectoryEnumerator &operator =(const TrajectoryEnumerator &) = delete;
 
-    TrajectoryEnumerator(const std::vector<UniquePtr> &blocks,
+    TrajectoryEnumerator(const real *timestamps, size_t n_timestamps,
+                         const std::vector<UniquePtr> &blocks,
                          size_t meteorites_per_block, size_t iterations_per_block,
                          size_t meteorite_idx)
-      : iterations_per_block_(iterations_per_block), meteorite_idx_(meteorite_idx),
+      : timestamps_(timestamps), n_timestamps_(n_timestamps), next_timestamp_{0},
+        iterations_per_block_(iterations_per_block), meteorite_idx_(meteorite_idx),
         block_(0), iteration_(0), finished_(false), blocks_(blocks)
     {
       assert(!blocks.empty());
@@ -35,30 +37,41 @@ class TrajectoryEnumerator
 
     // Moves to the next record, assign it to 'value' and returns true
     // If no records left, does not update 'value' and returns false
-    bool MoveNext(const Record *&value)
+    // The 'timestamp' flag is set if valus of this record must be passed to the functional
+    bool MoveNext(const Record *&value, bool &is_timestamp)
     {
       if (finished_)
       { return false; }
 
-      if (++iteration_ > iterations_per_block_)
+      if (iteration_ >= iterations_per_block_)
       {
         iteration_ = 0;
         block_ += 1;
         assert(block_ < blocks_.size());
       }
 
-      const Record *res = blocks_[block_].get() + iteration_ + meteorite_idx_ * iterations_per_block_;
-      if (res->t == 0.0)
+      is_timestamp = false;
+      value = blocks_[block_].get() + iteration_ + meteorite_idx_ * iterations_per_block_;
+      if (value->t < 0.0)
       {
         finished_ = true;
         return false;
       }
 
-      value = res;
+      if (next_timestamp_ < n_timestamps_ &&
+          value->t >= timestamps_[next_timestamp_])
+      {
+        next_timestamp_ += 1;
+        is_timestamp = true;
+      }
+
+      iteration_ += 1;
       return true;
     }
 
   private:
+    const real *timestamps_{};
+    size_t n_timestamps_{}, next_timestamp_{};
     const size_t iterations_per_block_{}, meteorite_idx_{};
     size_t block_{}, iteration_{};
     bool finished_{};
@@ -76,7 +89,6 @@ void BatchedAdams(BasicSolver::MeteoroidEnumerator &problems, real dt, real time
 
                   int32_t *dev_active_meteorites, VirtualMeteoroid *dev_problems,
                   ThreadContext<STEPS> *dev_contexts, Record *dev_records,
-                  real *dev_timestamps, real *dev_functional_args,
                 
                   const std::array<cudaStream_t, 2> &streams,
                   const std::array<cudaEvent_t, 2> &copy_events,
@@ -97,26 +109,16 @@ void BatchedAdams(BasicSolver::MeteoroidEnumerator &problems, real dt, real time
     });
   };
 
-  // Cache timestamps, they are the same for all meteorites
-  const real *timestamps = nullptr;
-  size_t n_timestamps = 0;
-  functional.GetTimeStamps(n_timestamps, timestamps);
-  assert(n_timestamps > 0);
-  HANDLE_ERROR(cudaMemcpy(dev_timestamps, timestamps,
-                          sizeof(real) * n_timestamps, cudaMemcpyHostToDevice));
-
   // Process all virtual meteoroids by batches
   const VirtualMeteoroid *meteoroids = nullptr;
   size_t n_meteoroids = 0;
   while (problems.MoveNext(meteoroids, n_meteoroids))
   {
     size_t half_size = n_meteoroids * iterations_per_batch;
-    size_t functional_args_size = n_timestamps * 2 * n_meteoroids;
-    auto functional_args = allocator.Alloc<real>(functional_args_size);
+    std::vector<UniquePtr> records;
 
     // Re-initialize buffers
     HANDLE_ERROR(cudaMemset(dev_contexts, 0, sizeof(ThreadContext<STEPS>) * n_meteoroids));
-    HANDLE_ERROR(cudaMemset(dev_functional_args, 0, sizeof(real) * functional_args_size));
 
     int32_t active_meteorites = n_meteoroids;
     HANDLE_ERROR(cudaMemcpy(dev_active_meteorites, &active_meteorites,
@@ -124,15 +126,12 @@ void BatchedAdams(BasicSolver::MeteoroidEnumerator &problems, real dt, real time
     HANDLE_ERROR(cudaMemcpy(dev_problems, meteoroids,
                             sizeof(VirtualMeteoroid) * n_meteoroids, cudaMemcpyHostToDevice));
 
-    std::vector<UniquePtr> records;
-
     // The first step of pipeline
     int iter = 0;
 
     BatchedAdamsKernel<STEPS>(dev_contexts, dev_active_meteorites,
                               dev_problems, n_meteoroids, dt, timeout,
-                              dev_timestamps, n_timestamps,
-                              dev_functional_args, dev_records + iter * half_size,
+                              dev_records + iter * half_size,
                               iterations_per_batch, threads_per_block, streams[iter]);
     HANDLE_ERROR(cudaEventRecord(kernel_events[iter], streams[iter]));
     HANDLE_ERROR(cudaMemcpyAsync(pinned_buffers[iter],
@@ -152,8 +151,7 @@ void BatchedAdams(BasicSolver::MeteoroidEnumerator &problems, real dt, real time
       HANDLE_ERROR(cudaStreamWaitEvent(streams[iter], kernel_events[!iter]));
       BatchedAdamsKernel<STEPS>(dev_contexts, dev_active_meteorites,
                                 dev_problems, n_meteoroids, dt, timeout,
-                                dev_timestamps, n_timestamps,
-                                dev_functional_args, dev_records + iter * half_size,
+                                dev_records + iter * half_size,
                                 iterations_per_batch, threads_per_block, streams[iter]);
       HANDLE_ERROR(cudaEventRecord(kernel_events[iter], streams[iter]));
 
@@ -185,37 +183,49 @@ void BatchedAdams(BasicSolver::MeteoroidEnumerator &problems, real dt, real time
 
     HANDLE_ERROR(cudaDeviceSynchronize());
 
-    // Register the simulation results
-    HANDLE_ERROR(cudaMemcpy(functional_args.get(), dev_functional_args,
-                            sizeof(real) * functional_args_size, cudaMemcpyDeviceToHost));
+    // Extract timestamps, they are the same for all meteorites
+    const real *timestamps = nullptr;
+    size_t n_timestamps = 0;
+    functional.GetTimeStamps(n_timestamps, timestamps);
+    assert(n_timestamps > 0);
+
+    std::vector<real> v, h;
+    v.reserve(n_timestamps);
+    h.reserve(n_timestamps);
 
     for (size_t meteoroid = 0; meteoroid < n_meteoroids; ++meteoroid)
     {
-      // Submit trajectory to the formatter
+      v.clear();
+      h.clear();
+
+      // Submit trajectory to the formatter, collect values for functional
       auto t_next = results.Started(meteoroids[meteoroid]);
     
-      TrajectoryEnumerator en(records, n_meteoroids, iterations_per_batch, meteoroid);
+      TrajectoryEnumerator en(timestamps, n_timestamps, records,
+                              n_meteoroids, iterations_per_batch, meteoroid);
       const Record *record{};
-      while (en.MoveNext(record))
+      bool is_timestamp{};
+      while (en.MoveNext(record, is_timestamp))
       {
         if (record->t >= t_next)
         {
           t_next = results.Store(record->t, record->M, record->V, record->h,
-                                  record->l, record->Gamma);
+                                 record->l, record->Gamma);
+        }
+        if (is_timestamp)
+        {
+          v.emplace_back(record->V);
+          h.emplace_back(record->h);
         }
       }
 
-      // Compute value of the functional for this meteoroid
-      real *V_args = functional_args.get() + meteoroid * n_timestamps * 2;
-      real *h_args = V_args + n_timestamps;
-      size_t timestamp = 0;
-      while (timestamp < n_timestamps && V_args[timestamp] != (real)0.0)
-      { timestamp++; };
-      auto f_val = functional.Compute(timestamp, V_args, h_args);
-
-      // Finalize the meteoroid
+      // Compute value of the functional and finalize the meteoroid
       // We can continue using 'record' as it is still valid
-      results.Finished(ISimulationRecorder::Classify(record->t, record->M, record->h), f_val);
+      assert(v.size() <= n_timestamps);
+      assert(h.size() == v.size());
+      auto f_val = functional.Compute(v.size(), v.data(), h.data());
+      auto reason = ISimulationRecorder::Classify(record->t, record->M, record->h);
+      results.Finished(reason, f_val);
     }
   }
 }
@@ -262,8 +272,6 @@ PedanticCudaSolver::~PedanticCudaSolver()
     buffer_problems_.reset();
     buffer_contexts_.reset();
     buffer_records_.reset();
-    buffer_timestamps_.reset();
-    buffer_functional_.reset();
 
     cudaFreeHost(pinned_buffers_[0]);
     cudaFreeHost(pinned_buffers_[1]);
@@ -290,20 +298,6 @@ void PedanticCudaSolver::SolveAny(MeteoroidEnumerator &problems,
                                   const IFunctional &functional,
                                   ISimulationRecorder &results)
 {
-  // Resize buffers for functional arguments and timestamps (if needed)
-  size_t n_timestamps{};
-  {
-    const real *_{};
-    functional.GetTimeStamps(n_timestamps, _);
-  }
-
-  if (n_timestamps_ < n_timestamps)
-  {
-    n_timestamps_ = n_timestamps;
-    HANDLE_ERROR(CudaAlloc(buffer_timestamps_, n_timestamps_ * sizeof(real)));
-    HANDLE_ERROR(CudaAlloc(buffer_functional_, n_timestamps_ * 2 * BatchSize() * sizeof(real)));
-  }
-
   // Perform simulations
   auto method = [&](auto contexts)
   {
@@ -311,7 +305,6 @@ void PedanticCudaSolver::SolveAny(MeteoroidEnumerator &problems,
                  config_.iterations_per_block, config_.threads_per_block,
                  (int32_t *)buffer_counter_.get(), (VirtualMeteoroid *)buffer_problems_.get(),
                  contexts, (Record *)buffer_records_.get(),
-                 (real *)buffer_timestamps_.get(), (real *)buffer_functional_.get(),
                  streams_, copy_events_, kernel_events_, pinned_buffers_);
   };
 

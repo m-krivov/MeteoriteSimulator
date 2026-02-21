@@ -52,7 +52,5 @@ class PedanticCudaSolver : public BasicSolver
     CudaPtr<uint8_t> buffer_problems_;
     CudaPtr<uint8_t> buffer_contexts_;
     CudaPtr<uint8_t> buffer_records_;
-    CudaPtr<uint8_t> buffer_timestamps_;
-    CudaPtr<uint8_t> buffer_functional_;
     size_t n_timestamps_{0};    // implicitly defines the size of 'buffer_functional_' and 'buffer_timestamps_'
 };
