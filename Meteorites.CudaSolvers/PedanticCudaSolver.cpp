@@ -12,8 +12,8 @@ namespace
 
 using UniquePtr = std::unique_ptr<Record, IterationAllocator::Deleter>;
 
-// Simulation results (trajectories) are stored in some slice-based format
-// This helper allows us to traverse them and distinguish records that corresponds to timestamps
+// Simulation results (trajectories) are stored in some internal slice-based format
+// This helper allows us to traverse them
 class TrajectoryEnumerator
 {
   public:
@@ -21,61 +21,92 @@ class TrajectoryEnumerator
     TrajectoryEnumerator(const TrajectoryEnumerator &) = delete;
     TrajectoryEnumerator &operator =(const TrajectoryEnumerator &) = delete;
 
-    TrajectoryEnumerator(const real *timestamps, size_t n_timestamps,
-                         const std::vector<UniquePtr> &blocks,
+    TrajectoryEnumerator(const std::vector<UniquePtr> &blocks,
                          size_t meteorites_per_block, size_t iterations_per_block,
                          size_t meteorite_idx)
-      : timestamps_(timestamps), n_timestamps_(n_timestamps), next_timestamp_{0},
-        iterations_per_block_(iterations_per_block), meteorite_idx_(meteorite_idx),
-        block_(0), iteration_(0), finished_(false), blocks_(blocks)
+      : blocks_(blocks), iterations_per_block_(iterations_per_block), meteorite_idx_(meteorite_idx),
+        iteration_{-1}
     {
       assert(!blocks.empty());
       assert(meteorites_per_block > 0);
       assert(iterations_per_block > 0);
       assert(meteorite_idx < meteorites_per_block);
+
+      dt_ = (blocks_[0].get() + 1)->t;
+      assert(blocks_[0]->t == (real)0.0);
+      assert(dt_ > (real)0.0);
     }
 
-    // Moves to the next record, assign it to 'value' and returns true
-    // If no records left, does not update 'value' and returns false
-    // The 'timestamp' flag is set if valus of this record must be passed to the functional
-    bool MoveNext(const Record *&value, bool &is_timestamp)
+    // Returns a pointer to the current trajectory point if the enumerator is valid
+    // Or nullptr otherwise
+    const Record *Current() const
+    { return current_; }
+
+    // Moves to the next record and returns true (or false, if no records left)
+    // Must be called before the first use of 'Current()'
+    bool MoveNext()
     {
       if (finished_)
       { return false; }
-
-      if (iteration_ >= iterations_per_block_)
-      {
-        iteration_ = 0;
-        block_ += 1;
-        assert(block_ < blocks_.size());
-      }
-
-      is_timestamp = false;
-      value = blocks_[block_].get() + iteration_ + meteorite_idx_ * iterations_per_block_;
-      if (value->t < 0.0)
+      
+      iteration_ += 1;
+      assert(iteration_ >= 0);
+      auto block = iteration_ / iterations_per_block_;
+      auto offset = iteration_ % iterations_per_block_;
+      if (block >= blocks_.size() ||
+          (current_ = blocks_[block].get() + offset + meteorite_idx_ * iterations_per_block_)->t < 0.0)
       {
         finished_ = true;
+        current_ = nullptr;
         return false;
       }
 
-      if (next_timestamp_ < n_timestamps_ &&
-          value->t >= timestamps_[next_timestamp_])
-      {
-        next_timestamp_ += 1;
-        is_timestamp = true;
-      }
-
-      iteration_ += 1;
       return true;
     }
 
+    // Tries to move to the first record made after time 't'
+    // If no such record exists, returns false
+    bool MoveTo(real t)
+    {
+      t = std::max((real)0, t);
+      iteration_ = (int64_t)(t / dt_) - 1;
+      current_ = nullptr;
+      finished_ = false;
+
+      // To avoid accuracy issues, let's traverse one excessive record
+      iteration_ = std::max((int64_t)-1, iteration_ - 1);
+      while (MoveNext()) {
+        if (Current()->t >= t) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // Moves to the last record
+    // Since at least one record is always exist, this method does not return status
+    void MoveLast()
+    {
+      // We need to traverse the last block to detect the stop marker
+      iteration_ = (blocks_.size() - 1) * iterations_per_block_ - 1;
+      current_ = nullptr;
+      finished_ = false;
+      while (MoveNext()) {}
+
+      iteration_ = std::max((int64_t)-1, iteration_ - 2);
+      current_ = nullptr;
+      finished_ = false;
+      bool status = MoveNext();
+      assert(status);
+    }
+
   private:
-    const real *timestamps_{};
-    size_t n_timestamps_{}, next_timestamp_{};
-    const size_t iterations_per_block_{}, meteorite_idx_{};
-    size_t block_{}, iteration_{};
-    bool finished_{};
     const std::vector<UniquePtr> &blocks_;
+    const size_t iterations_per_block_{}, meteorite_idx_{};
+    real dt_{};
+    int64_t iteration_{};
+    const Record *current_{};
+    bool finished_{};
 };
 
 
@@ -195,36 +226,36 @@ void BatchedAdams(BasicSolver::MeteoroidEnumerator &problems, real dt, real time
 
     for (size_t meteoroid = 0; meteoroid < n_meteoroids; ++meteoroid)
     {
-      v.clear();
-      h.clear();
-
-      // Submit trajectory to the formatter, collect values for functional
+      // Submit trajectory to the formatter
       auto t_next = results.Started(meteoroids[meteoroid]);
     
-      TrajectoryEnumerator en(timestamps, n_timestamps, records,
-                              n_meteoroids, iterations_per_batch, meteoroid);
-      const Record *record{};
-      bool is_timestamp{};
-      while (en.MoveNext(record, is_timestamp))
+      TrajectoryEnumerator en(records, n_meteoroids, iterations_per_batch, meteoroid);
+      while (en.MoveTo(t_next))
       {
-        if (record->t >= t_next)
-        {
-          t_next = results.Store(record->t, record->M, record->V, record->h,
-                                 record->l, record->Gamma);
-        }
-        if (is_timestamp)
-        {
-          v.emplace_back(record->V);
-          h.emplace_back(record->h);
-        }
+        auto record = en.Current();
+        assert(record != nullptr);
+        t_next = results.Store(record->t, record->M, record->V, record->h,
+                               record->l, record->Gamma);
       }
 
-      // Compute value of the functional and finalize the meteoroid
-      // We can continue using 'record' as it is still valid
+      // Collect values for the functional and compute it
+      v.clear();
+      h.clear();
+      for (size_t i = 0; i < n_timestamps; i++)
+      {
+        if (!en.MoveTo(timestamps[i]))
+        { break; }
+
+        v.emplace_back(en.Current()->V);
+        h.emplace_back(en.Current()->h);
+      }
       assert(v.size() <= n_timestamps);
       assert(h.size() == v.size());
       auto f_val = functional.Compute(v.size(), v.data(), h.data());
-      auto reason = ISimulationRecorder::Classify(record->t, record->M, record->h);
+      
+      // Finalize the meteoroid
+      en.MoveLast();
+      auto reason = ISimulationRecorder::Classify(en.Current()->t, en.Current()->M, en.Current()->h);
       results.Finished(reason, f_val);
     }
   }

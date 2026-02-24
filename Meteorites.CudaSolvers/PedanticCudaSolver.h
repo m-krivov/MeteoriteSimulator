@@ -4,7 +4,7 @@
 #include "Meteorites.Core/Solvers/BasicSolver.h"
 
 
-// Settings for CudaSolver
+// Settings for PedanticCudaSolver
 struct PedanticCudaSolverConfig
 {
   // How many CUDA threads must be spawned per each block
@@ -18,10 +18,6 @@ struct PedanticCudaSolverConfig
   // How many blocks must be spawned per each CUDA streaming multiprocessor
   // Large numbers can lead to high memory usage
   size_t blocks_per_sm = 4;
-
-  PedanticCudaSolverConfig() = default;
-  PedanticCudaSolverConfig(const PedanticCudaSolverConfig &) = default;
-  PedanticCudaSolverConfig &operator =(const PedanticCudaSolverConfig &) = default;
 };
 
 // Version for CUDA kernel debugging

@@ -10,16 +10,13 @@
 #include "Meteorites.Core/Functionals/L2Functional.h"
 #include "Meteorites.Core/Recorders/BufferingRecorder.h"
 #include "Meteorites.Core/Recorders/MetaRecorder.h"
+#include "Meteorites.Core/Solvers/ISolver.h"
 #include "Meteorites.Core/Meteoroids/CollectionGenerator.h"
 #include "Meteorites.Core/Meteoroids/MonteCarloGenerator.h"
-#include "Meteorites.CpuSolvers/GoldSolver.h"
 #include "Meteorites.KnowledgeBase/KnownMeteorites.h"
 #include "Meteorites.KnowledgeBase/PossibleParameters.h"
 
-#if defined(METEORITES_CUDA)
-  #include "Meteorites.CudaSolvers/PedanticCudaSolver.h"
-#endif
-
+#include "Factory.h"
 #include "Exporters/MeanStdevExporter.h"
 #include "Exporters/TrajectoryExporter.h"
 #include "Exporters/TrajectoryVisualizer.h"
@@ -30,7 +27,7 @@ constexpr auto     METEORITE         = KnownMeteorites::ID::INNISFREE;
 constexpr auto     PARAMETERS        = Distribution::UNIFORM_ANY;
 constexpr uint32_t SEED              = 25102018;
 constexpr float    PROGRESS_BAR_STEP = 0.01f;
-constexpr real     TIMEOUT           = (real)60.0 * 30;
+constexpr real     TIMEOUT           = (real)60.0 * 15;
 
 constexpr size_t   STAGE1_N_TOTAL    = 1000000;
 constexpr size_t   STAGE1_N_TOP      = 1000;
@@ -118,20 +115,15 @@ std::string ToString(NumericalAlgorithm alg)
   }
 }
 
-std::unique_ptr<ISolver> CreateSolver()
-{
-#if defined(METEORITES_CUDA)
-  if constexpr (USE_GPU)
-  { return std::make_unique<PedanticCudaSolver>(); }
-  else
-#endif
-  { return std::make_unique<GoldSolver>(); }
-}
-
 
 int main()
 {
   using clock = std::chrono::high_resolution_clock;
+#if defined(METEORITES_CUDA)
+  Factory factory(USE_GPU);
+#else
+  Factory factory;
+#endif
 
   decltype(auto) meteorite = KnownMeteorites::Ref().Get(METEORITE);
   decltype(auto) params    = PossibleParameters::Get(PARAMETERS);
@@ -174,7 +166,7 @@ int main()
       STAGE1_FUNC functional(meteorite);
       MetaRecorder recorder(STAGE1_N_TOP, STAGE1_N_TOP * 10);
 
-      std::unique_ptr<ISolver> solver = CreateSolver();
+      std::unique_ptr<ISolver> solver = factory.StageOneSolver();
       solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
       solver->Solve(generator, functional, recorder);
     
@@ -193,7 +185,7 @@ int main()
     std::cout << "     dt:         " << STAGE2_DT << " seconds" << std::endl;
     std::vector<MeteoroidTrajectory> stage2_trajectories;
     {
-      std::unique_ptr<ISolver> solver = std::make_unique<GoldSolver>();
+      std::unique_ptr<ISolver> solver = factory.StageTwoSolver();
       solver->Configure(STAGE2_METHOD, STAGE2_DT, TIMEOUT);
 
       STAGE2_FUNC functional(meteorite);

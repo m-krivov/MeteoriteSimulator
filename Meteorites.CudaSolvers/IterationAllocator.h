@@ -11,6 +11,8 @@ class IterationAllocator
     struct State;
 
   public:
+    static constexpr double GROWTH_FACTOR = 1.25; // If we need 1 GB, allocate 1.25 GB instead
+
     class Deleter
     {
       public:
@@ -67,8 +69,10 @@ class IterationAllocator
           assert(state_->refs == 1);
           if (state_->max_allocated > state_->max_pool_size)
           {
-            state_->pool.reset(AlignedNew<uint8_t>(state_->max_allocated));
-            state_->max_pool_size = state_->max_allocated;
+            assert(GROWTH_FACTOR >= 1);
+            size_t new_size = (size_t)(state_->max_allocated * GROWTH_FACTOR);
+            state_->pool.reset(AlignedNew<uint8_t>(new_size));
+            state_->max_pool_size = new_size;
           }
           state_->surpluses.clear();
           state_->cur_pool_size = 0;
