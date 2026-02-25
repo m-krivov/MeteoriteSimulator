@@ -2,6 +2,8 @@
 #include "Meteorites.Core/Defs.h"
 
 #include "ISimulationRecorder.h"
+#include "MeteoroidSummary.h"
+
 
 // Accumulates results from multiple experiments and stores meta data about the best ones
 // Skips all information about trajectory: keeps only case and functional's value
@@ -23,12 +25,13 @@ class MetaRecorder : public ISimulationRecorder
     // The member of 'ISimulationRecorder'
     virtual void Finished(Reason reason, double accuracy) override;
 
-    // Extracts N best cases that were reported to this formatter
-    // Resets the internal ratings
-    void ExportAndReset(std::vector<std::pair<VirtualMeteoroid, double> > &results);
+    // Extracts 'n_best' meteoroids that were reported to this formatter
+    // After that, resets the internal state
+    void MoveTo(std::vector<MeteoroidSummary> &results);
 
   private:
     size_t n_best_, buffer_size_;
     double accuracy_threshold_;
-    std::vector<std::pair<VirtualMeteoroid, double> > problems_;
+    std::optional<VirtualMeteoroid> current_;
+    std::vector<MeteoroidSummary> problems_;
 };

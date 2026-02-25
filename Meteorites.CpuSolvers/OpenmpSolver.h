@@ -3,19 +3,22 @@
 
 #include "Meteorites.Core/Solvers/BasicSolver.h"
 
-// Uses one-step, two-step or three-step Adams method to solve ordinary differential equations
-// May be used to verify more complex solvers with some performance optimizations
-class GoldSolver : public BasicSolver
+// This solver implements the same algorithm as GoldSolver but leverages OpenMP parallelization
+class OpenmpSolver : public BasicSolver
 {
   public:
-    GoldSolver() = default;
+    OpenmpSolver(size_t cores = 0);
 
   protected:
     // BasicSolver method
-    virtual size_t BatchSize() const override final { return 1; }
+    virtual size_t BatchSize() const override final
+    { assert(cores_ > 0); return cores_; }
 
     // BasicSolver method
     virtual void SolveAny(MeteoroidEnumerator &problems,
                           const IFunctional &functional,
                           ISimulationRecorder &results) override final;
+
+  private:
+    size_t cores_{1};
 };

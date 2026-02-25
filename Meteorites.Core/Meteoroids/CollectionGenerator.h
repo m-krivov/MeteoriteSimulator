@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Meteorites.Core/Recorders/MeteoroidSummary.h"
 #include "Meteorites.Core/Meteoroids/BasicMeteoroidGenerator.h"
 
 
@@ -18,11 +19,11 @@ class CollectionGenerator : public BasicMeteoroidGenerator
     {}
 
     // Version suitable for 'MetaFormatter'
-    CollectionGenerator(const std::vector<std::pair<VirtualMeteoroid, double>> &meteoroids)
+    CollectionGenerator(const std::vector<MeteoroidSummary> &meteoroids)
     {
       meteoroids_.reserve(meteoroids.size());
-      for (const auto &[meteoroid, loss] : meteoroids)
-      { meteoroids_.emplace_back(meteoroid); }
+      for (const auto &record : meteoroids)
+      { meteoroids_.emplace_back(record.Meteoroid()); }
       current_ = meteoroids_.begin();
     }
         

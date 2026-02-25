@@ -159,7 +159,7 @@ int main()
     std::cout << "     Meteoroids: " << STAGE1_N_TOTAL   << " pcs" << std::endl;
     std::cout << "     Method:     " << ToString(STAGE1_METHOD) << std::endl;
     std::cout << "     dt:         " << STAGE1_DT << " seconds" << std::endl;
-    std::vector<std::pair<VirtualMeteoroid, double> > stage1_meteoroids;
+    std::vector<MeteoroidSummary> stage1_meteoroids;
     {
       MonteCarloGenerator generator(meteorite, params, STAGE1_N_TOTAL, SEED);
       generator.OnProgress(MyProgressBar::Create(), PROGRESS_BAR_STEP);
@@ -170,7 +170,7 @@ int main()
       solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
       solver->Solve(generator, functional, recorder);
     
-      recorder.ExportAndReset(stage1_meteoroids);
+      recorder.MoveTo(stage1_meteoroids);
       assert(stage1_meteoroids.size() == STAGE1_N_TOP);
     }
     std::cout << std::endl;
