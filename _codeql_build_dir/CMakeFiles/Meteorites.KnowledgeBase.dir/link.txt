@@ -1,2 +1,0 @@
-/usr/bin/ar qc meteorites.knowledge.a CMakeFiles/Meteorites.KnowledgeBase.dir/Meteorites.KnowledgeBase/KnownMeteorites.cpp.o CMakeFiles/Meteorites.KnowledgeBase.dir/Meteorites.KnowledgeBase/PossibleParameters.cpp.o
-/usr/bin/ranlib meteorites.knowledge.a
