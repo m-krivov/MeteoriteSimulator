@@ -14,9 +14,17 @@ class L2Functional : public BasicFunctional
       : BasicFunctional(meteorite, lambda_v, lambda_h)
     { }
 
+    // Constructor with custom weights for each measurement point
+    L2Functional(const std::shared_ptr<const IMeteorite> &meteorite,
+                 real lambda_v,
+                 real lambda_h,
+                 const std::vector<real> &weights)
+      : BasicFunctional(meteorite, lambda_v, lambda_h, weights)
+    { }
+
     // The member of 'IFunctional'
     virtual std::string Name() const override final
-    { return "L2"; }
+    { return HasWeights() ? "L2-Weighted" : "L2"; }
 
     // The member of 'IFunctional'
     virtual double Compute(size_t num, const real *v, const real *h) const override final;

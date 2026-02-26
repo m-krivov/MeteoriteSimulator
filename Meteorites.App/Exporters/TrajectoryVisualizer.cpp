@@ -481,6 +481,18 @@ void TrajectoryVisualizer::Export(const std::vector<MeteoroidTrajectory> &trajec
 
   f->draw();
   f->save((Directory() / "trajectories.png").string(), "png");
+  
+  // Save functional structure information if available
+  if (functional_ != nullptr)
+  {
+    std::ofstream f_info(Directory() / "functional_info.txt");
+    if (f_info.good())
+    {
+      f_info << "Functional Structure Information" << std::endl;
+      f_info << "================================" << std::endl << std::endl;
+      f_info << functional_->GetStructureDescription() << std::endl;
+    }
+  }
 }
 
 #endif

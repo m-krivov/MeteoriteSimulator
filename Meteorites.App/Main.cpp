@@ -8,6 +8,7 @@
 #include "Meteorites.Core/Functionals/CFunctional.h"
 #include "Meteorites.Core/Functionals/L1Functional.h"
 #include "Meteorites.Core/Functionals/L2Functional.h"
+#include "Meteorites.Core/Functionals/BurnTimePenaltyFunctional.h"
 #include "Meteorites.Core/Recorders/BufferingRecorder.h"
 #include "Meteorites.Core/Recorders/MetaRecorder.h"
 #include "Meteorites.Core/Meteoroids/CollectionGenerator.h"
@@ -31,6 +32,13 @@ constexpr auto     PARAMETERS        = Distribution::UNIFORM_ANY;
 constexpr uint32_t SEED              = 25102018;
 constexpr float    PROGRESS_BAR_STEP = 0.01f;
 constexpr real     TIMEOUT           = (real)60.0 * 30;
+
+// Stage 0: Quick scan to optimize entry angle range
+constexpr size_t   STAGE0_N_TOTAL    = 10000;
+constexpr size_t   STAGE0_N_TOP      = 100;
+constexpr auto     STAGE0_METHOD     = NumericalAlgorithm::ONE_STEP_ADAMS;
+constexpr real     STAGE0_DT         = (real)1e-2;
+using              STAGE0_FUNC       = L2Functional;
 
 constexpr size_t   STAGE1_N_TOTAL    = 1000000;
 constexpr size_t   STAGE1_N_TOP      = 1000;
@@ -160,6 +168,52 @@ int main()
   indicators::show_console_cursor(false);
   try
   {
+    // Stage 0.
+    // Quick scan to find optimal entry angle range
+    std::cout << "Stage 0. Quick scan to optimize entry angle range";
+    std::cout << std::endl;
+    std::cout << "     Meteoroids: " << STAGE0_N_TOTAL   << " pcs" << std::endl;
+    std::cout << "     Method:     " << ToString(STAGE0_METHOD) << std::endl;
+    std::cout << "     dt:         " << STAGE0_DT << " seconds" << std::endl;
+    std::vector<std::pair<VirtualMeteoroid, double> > stage0_meteoroids;
+    real gamma_min = (real)90.0, gamma_max = (real)0.0;
+    {
+      MonteCarloGenerator generator(meteorite, params, STAGE0_N_TOTAL, SEED);
+      generator.OnProgress(MyProgressBar::Create(), PROGRESS_BAR_STEP);
+      STAGE0_FUNC functional(meteorite);
+      MetaRecorder recorder(STAGE0_N_TOP, STAGE0_N_TOP * 10);
+
+      std::unique_ptr<ISolver> solver = CreateSolver();
+      solver->Configure(STAGE0_METHOD, STAGE0_DT, t_end + (real)0.1);
+      solver->Solve(generator, functional, recorder);
+    
+      recorder.ExportAndReset(stage0_meteoroids);
+      assert(stage0_meteoroids.size() == STAGE0_N_TOP);
+      
+      // Analyze the best meteoroids to find optimal gamma range
+      for (const auto &meteoroid : stage0_meteoroids)
+      {
+        real gamma_deg = meteoroid.first.Gamma0 * (real)180.0 / (real)M_PI;
+        gamma_min = std::min(gamma_min, gamma_deg);
+        gamma_max = std::max(gamma_max, gamma_deg);
+      }
+      
+      // Add some margin (10%) to the range
+      real gamma_margin = (gamma_max - gamma_min) * (real)0.1;
+      gamma_min = std::max((real)0.0, gamma_min - gamma_margin);
+      gamma_max = std::min((real)90.0, gamma_max + gamma_margin);
+      
+      std::cout << "     Optimal entry angle range: [" << gamma_min << ", " << gamma_max << "] degrees" << std::endl;
+    }
+    std::cout << std::endl;
+
+    // Update parameters with refined gamma range
+    real gamma_min_rad = gamma_min * (real)M_PI / (real)180.0;
+    real gamma_max_rad = gamma_max * (real)M_PI / (real)180.0;
+    ParameterSet refined_params(params.H(), params.Ch(), params.Rho(), 
+                                params.Cd(), params.Cl(), params.M0(),
+                                std::make_pair(gamma_min_rad, gamma_max_rad));
+
     // Stage 1.
     // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteoroids, select 'STAGE1_N_TOTAL' best of them
     std::cout << "Stage 1. Computing huge amount of virtual meteoroids with low precision";
@@ -169,7 +223,7 @@ int main()
     std::cout << "     dt:         " << STAGE1_DT << " seconds" << std::endl;
     std::vector<std::pair<VirtualMeteoroid, double> > stage1_meteoroids;
     {
-      MonteCarloGenerator generator(meteorite, params, STAGE1_N_TOTAL, SEED);
+      MonteCarloGenerator generator(meteorite, refined_params, STAGE1_N_TOTAL, SEED);
       generator.OnProgress(MyProgressBar::Create(), PROGRESS_BAR_STEP);
       STAGE1_FUNC functional(meteorite);
       MetaRecorder recorder(STAGE1_N_TOP, STAGE1_N_TOP * 10);
