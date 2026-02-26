@@ -21,6 +21,13 @@ class IFunctional
     // The actual number of arguments may differ from expected: such values just increases error
     virtual double Compute(size_t num, const real *v, const real *h) const = 0;
 
+    // Returns a description of the functional structure for visualization
+    // Default implementation returns basic info
+    virtual std::string GetStructureDescription() const
+    {
+      return "Functional: " + Name();
+    }
+
   protected:
     IFunctional() = default;
 };
