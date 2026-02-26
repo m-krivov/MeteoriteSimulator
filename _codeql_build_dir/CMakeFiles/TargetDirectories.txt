@@ -1,0 +1,8 @@
+/home/runner/work/MeteoriteSimulator/MeteoriteSimulator/_codeql_build_dir/CMakeFiles/Meteorites.Core.dir
+/home/runner/work/MeteoriteSimulator/MeteoriteSimulator/_codeql_build_dir/CMakeFiles/Meteorites.CpuSolvers.dir
+/home/runner/work/MeteoriteSimulator/MeteoriteSimulator/_codeql_build_dir/CMakeFiles/Meteorites.KnowledgeBase.dir
+/home/runner/work/MeteoriteSimulator/MeteoriteSimulator/_codeql_build_dir/CMakeFiles/Meteorites.App.dir
+/home/runner/work/MeteoriteSimulator/MeteoriteSimulator/_codeql_build_dir/CMakeFiles/Meteorites.Benchmark.dir
+/home/runner/work/MeteoriteSimulator/MeteoriteSimulator/_codeql_build_dir/CMakeFiles/Meteorites.Tests.dir
+/home/runner/work/MeteoriteSimulator/MeteoriteSimulator/_codeql_build_dir/CMakeFiles/edit_cache.dir
+/home/runner/work/MeteoriteSimulator/MeteoriteSimulator/_codeql_build_dir/CMakeFiles/rebuild_cache.dir
