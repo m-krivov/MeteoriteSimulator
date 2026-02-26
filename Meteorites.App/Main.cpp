@@ -45,6 +45,11 @@ constexpr size_t   STAGE1_N_TOP      = 1000;
 constexpr auto     STAGE1_METHOD     = NumericalAlgorithm::TWO_STEP_ADAMS;
 constexpr real     STAGE1_DT         = (real)1e-3;
 using              STAGE1_FUNC       = L2Functional;
+// Note: To use weighted functionals (for meteorites where later measurements are less accurate):
+// 1. Get measurement count from meteorite trajectory
+// 2. Generate decaying weights: auto weights = BasicFunctional::GenerateDecayingWeights(n_records, 0.5);
+// 3. Create functional: L2Functional functional(meteorite, 1.0, 1.0, weights);
+// This gives exponentially decaying weights to later measurements (as recommended for Halliday1996 data)
 
 constexpr size_t   STAGE2_N_TOP      = 100;
 constexpr auto     STAGE2_METHOD     = NumericalAlgorithm::THREE_STEP_ADAMS;
