@@ -92,6 +92,51 @@ TEST_F(WeightedFunctionalTests, WeightedL2Functional)
   }
 }
 
+TEST_F(WeightedFunctionalTests, WeightedVsNonWeightedWithSignificantError)
+{
+  // Test with intentionally perturbed values to ensure weighted behavior is observable
+  decltype(auto) meteorite = KnownMeteorites::Ref().Get(KnownMeteorites::ID::INNISFREE);
+  
+  size_t n_records = 0;
+  const real *time = nullptr, *v = nullptr, *h = nullptr;
+  meteorite->Trajectory(n_records, time, v, h);
+  ASSERT_GT(n_records, 3);
+  
+  // Create weighted and non-weighted functionals
+  auto weights = BasicFunctional::GenerateDecayingWeights(n_records, 0.5);
+  L2Functional weighted_func(meteorite, 1.0, 1.0, weights);
+  L2Functional normal_func(meteorite, 1.0, 1.0);
+  
+  // Perturb early values to create baseline error
+  std::vector<real> test_v(n_records);
+  std::vector<real> test_h(n_records);
+  for (size_t i = 0; i < n_records; i++)
+  {
+    test_v[i] = v[i] * 1.05f;  // 5% error in velocity
+    test_h[i] = h[i] * 1.05f;  // 5% error in height
+  }
+  
+  double weighted_base = weighted_func.Compute(n_records, test_v.data(), test_h.data());
+  double normal_base = normal_func.Compute(n_records, test_v.data(), test_h.data());
+  
+  ASSERT_GT(weighted_base, 0.01);  // Ensure significant error
+  ASSERT_GT(normal_base, 0.01);
+  
+  // Now add additional error to the last measurement
+  test_h[n_records - 1] *= 0.8f;  // 20% additional error on last point
+  
+  double weighted_late = weighted_func.Compute(n_records, test_v.data(), test_h.data());
+  double normal_late = normal_func.Compute(n_records, test_v.data(), test_h.data());
+  
+  // Both should increase, but weighted should increase less (late error has lower weight)
+  double weighted_increase = (weighted_late - weighted_base) / weighted_base;
+  double normal_increase = (normal_late - normal_base) / normal_base;
+  
+  ASSERT_GT(weighted_increase, 0.0);
+  ASSERT_GT(normal_increase, 0.0);
+  ASSERT_LT(weighted_increase, normal_increase);
+}
+
 TEST_F(WeightedFunctionalTests, GetStructureDescription)
 {
   decltype(auto) meteorite = KnownMeteorites::Ref().Get(KnownMeteorites::ID::INNISFREE);

@@ -63,11 +63,15 @@ std::vector<real> BasicFunctional::GenerateDecayingWeights(size_t count, real de
   }
   else
   {
-    // Exponential decay: weight = exp(-decay_factor * i / (count - 1))
+    // Exponential decay: weight = exp(-decay_factor * scale * t)
+    // Scale factor of 3.0 provides good balance: 
+    // - At decay_factor=0.5, last weight ≈ 0.22 (exp(-1.5))
+    // - At decay_factor=1.0, last weight ≈ 0.05 (exp(-3.0))
+    constexpr real DECAY_SCALE = (real)3.0;
     for (size_t i = 0; i < count; i++)
     {
       real t = (real)i / (real)(count - 1);
-      weights[i] = std::exp(-decay_factor * (real)3.0 * t);  // factor of 3 for reasonable decay
+      weights[i] = std::exp(-decay_factor * DECAY_SCALE * t);
     }
   }
   

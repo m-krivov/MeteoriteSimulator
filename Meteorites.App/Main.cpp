@@ -38,6 +38,7 @@ constexpr size_t   STAGE0_N_TOTAL    = 10000;
 constexpr size_t   STAGE0_N_TOP      = 100;
 constexpr auto     STAGE0_METHOD     = NumericalAlgorithm::ONE_STEP_ADAMS;
 constexpr real     STAGE0_DT         = (real)1e-2;
+constexpr real     STAGE0_GAMMA_MARGIN = (real)0.1;  // 10% margin around optimal gamma range
 using              STAGE0_FUNC       = L2Functional;
 
 constexpr size_t   STAGE1_N_TOTAL    = 1000000;
@@ -203,8 +204,8 @@ int main()
         gamma_max = std::max(gamma_max, gamma_deg);
       }
       
-      // Add some margin (10%) to the range
-      real gamma_margin = (gamma_max - gamma_min) * (real)0.1;
+      // Add some margin (STAGE0_GAMMA_MARGIN) to the range
+      real gamma_margin = (gamma_max - gamma_min) * STAGE0_GAMMA_MARGIN;
       gamma_min = std::max((real)0.0, gamma_min - gamma_margin);
       gamma_max = std::min((real)90.0, gamma_max + gamma_margin);
       
