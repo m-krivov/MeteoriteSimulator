@@ -1,0 +1,2 @@
+/usr/bin/ar qc meteorites.cpu.a CMakeFiles/Meteorites.CpuSolvers.dir/Meteorites.CpuSolvers/GoldSolver.cpp.o
+/usr/bin/ranlib meteorites.cpu.a
