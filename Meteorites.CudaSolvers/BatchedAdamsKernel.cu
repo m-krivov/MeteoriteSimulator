@@ -7,7 +7,7 @@ namespace
 {
 
 template <unsigned int STEPS>
-__device__ void InitContext(ThreadContext<STEPS> &ctx, const VirtualMeteoroid &meteoroid, real dt, size_t idx,
+__device__ void InitContext(ThreadContext<STEPS> &ctx, const VirtualMeteoroid &meteoroid, real dt,
                             Record *&record)
 {
   Adams::Unchangeable params(meteoroid);
@@ -82,7 +82,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_thre
   Adams::Unchangeable params(meteoroid);
   if (ctx.t == 0.0) // new meteoroid
   {
-    InitContext(ctx, meteoroid, dt, idx, record);
+    InitContext(ctx, meteoroid, dt, record);
     t = dt * (real)STEPS;
     nxt = STEPS;
     timestamp = 0;

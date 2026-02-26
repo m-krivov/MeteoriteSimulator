@@ -2,6 +2,10 @@
 #include "Meteorites.Core/Defs.h"
 
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
+#include <thrust/copy.h>
+#include <thrust/device_vector.h>
+#include <thrust/sort.h>
 
 // Retarget helper functions to device
 #if defined(__CUDA_ARCH__)
