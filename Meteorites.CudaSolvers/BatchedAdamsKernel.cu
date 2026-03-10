@@ -7,7 +7,7 @@ namespace
 {
 
 template <unsigned int STEPS>
-__device__ void InitContext(ThreadContext<STEPS> &ctx, const VirtualMeteoroid &meteoroid, real dt, size_t idx,
+__device__ void InitContext(ThreadContext &ctx, const VirtualMeteoroid &meteoroid, real dt, size_t idx,
                             Record *&record)
 {
   Adams::Unchangeable params(meteoroid);
@@ -55,7 +55,7 @@ __device__ void InitContext(ThreadContext<STEPS> &ctx, const VirtualMeteoroid &m
 }
 
 template <unsigned int STEPS>
-__global__ void AdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_threads,
+__global__ void AdamsKernel(uint8_t *contexts, int32_t *active_threads,
                             const VirtualMeteoroid *problems, size_t n_problems,
                             real dt, real timeout,
                             Record *records,
@@ -66,7 +66,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_thre
   if (idx >= n_problems)
   { return; }
 
-  ThreadContext<STEPS> &ctx = contexts[idx];
+  ThreadContext &ctx = *(ThreadContext *)(contexts + SizeOfThreadContext(STEPS) * idx);
   if (ctx.ended)
   { return; }
 
@@ -80,7 +80,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_thre
   Adams::Unchangeable params(meteoroid);
   if (ctx.t == 0.0) // new meteoroid
   {
-    InitContext(ctx, meteoroid, dt, idx, record);
+    InitContext<STEPS>(ctx, meteoroid, dt, idx, record);
     t = dt * (real)STEPS;
     nxt = STEPS;
     iters_count = STEPS + 1;
@@ -125,10 +125,9 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_thre
 } // unnamed namespace
 
 
-template <unsigned int STEPS>
-void BatchedAdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_threads,
+void BatchedAdamsKernel(ThreadContext *contexts, int32_t *active_threads,
                         const VirtualMeteoroid *problems, size_t n_problems,
-                        real dt, real timeout,
+                        size_t adams_steps, real dt, real timeout,
                         Record *records,
                         size_t iterations, size_t threads_per_block, cudaStream_t stream)
 {
@@ -138,24 +137,28 @@ void BatchedAdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_threads,
 
   dim3 threads{ (uint32_t)threads_per_block };
   dim3 blocks(((n_problems - 1) / threads.x) + 1);
-  AdamsKernel<STEPS><<<blocks, threads, 0, stream>>>(contexts, active_threads,
+  switch (adams_steps)
+  {
+    case 1:
+      AdamsKernel<1><<<blocks, threads, 0, stream>>>((uint8_t *)contexts, active_threads,
                                                      problems, n_problems, dt, timeout,
                                                      records, iterations);
+      break;
+
+    case 2:
+      AdamsKernel<2><<<blocks, threads, 0, stream>>>((uint8_t *)contexts, active_threads,
+                                                     problems, n_problems, dt, timeout,
+                                                     records, iterations);
+      break;
+
+    case 3:
+      AdamsKernel<3><<<blocks, threads, 0, stream>>>((uint8_t *)contexts, active_threads,
+                                                     problems, n_problems, dt, timeout,
+                                                     records, iterations);
+     break;
+    
+    default:
+      throw std::runtime_error("Unsupported Adams' steps count");
+  }
   HANDLE_ERROR(cudaGetLastError());
 }
-
-template
-void BatchedAdamsKernel<1u>(ThreadContext<1u> *contexts, int32_t *active_threads,
-                            const VirtualMeteoroid *problems, size_t n_problems, real dt, real timeout,
-                            Record *records,
-                            size_t iterations, size_t threads_per_block, cudaStream_t stream);
-template
-void BatchedAdamsKernel<2u>(ThreadContext<2u> *contexts, int32_t *active_threads,
-                            const VirtualMeteoroid *problems, size_t n_problems, real dt, real timeout,
-                            Record *records,
-                            size_t iterations, size_t threads_per_block, cudaStream_t stream);
-template
-void BatchedAdamsKernel<3u>(ThreadContext<3u> *contexts, int32_t *active_threads,
-                            const VirtualMeteoroid *problems, size_t n_problems, real dt, real timeout,
-                            Record *records,
-                            size_t iterations, size_t threads_per_block, cudaStream_t stream);

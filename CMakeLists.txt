@@ -112,6 +112,7 @@ if(${METEORITES_CUDA})
   find_cpp_sources(${ROOT_DIR}/Meteorites.CudaSolvers METEORITES_CUDA_H METEORITES_CUDA_CPP METEORITES_CUDA_CU)
   add_library(Meteorites.CudaSolvers STATIC ${METEORITES_CUDA_H} ${METEORITES_CUDA_CPP} ${METEORITES_CUDA_CU})
   configure_cpp_proj(Meteorites.CudaSolvers "meteorites.cuda")
+  target_compile_options(Meteorites.CudaSolvers PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 endif()
 
 find_cpp_sources(${ROOT_DIR}/Meteorites.KnowledgeBase METEORITES_KNOWLEDGE_H METEORITES_KNOWLEDGE_CPP METEORITES_KNOWLEDGE_CU)

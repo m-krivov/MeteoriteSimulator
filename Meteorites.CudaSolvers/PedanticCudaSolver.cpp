@@ -3,6 +3,30 @@
 
 #include "BatchedAdamsKernel.h"
 
+
+//-----------------------------------------
+//--- PedanticCudaSolver::DeviceContext ---
+//-----------------------------------------
+
+// All allocated CUDA resources are stored in a single place
+struct PedanticCudaSolver::DeviceContext
+{
+  // Buffers were allocated for batches of this size
+  size_t batch_size{};
+
+  std::array<cudaStream_t, 2> streams;
+  std::array<cudaEvent_t, 2> copy_events;
+  std::array<cudaEvent_t, 2> kernel_events;
+
+  std::array<uint8_t *, 2> pinned_buffers;
+  
+  CudaPtr<int32_t> counter;
+  CudaPtr<VirtualMeteoroid> meteoroids;
+  CudaPtr<uint8_t> thread_contexts;
+  CudaPtr<Record> records;
+};
+
+
 //--------------------
 //--- BatchedAdams ---
 //--------------------
@@ -112,22 +136,14 @@ class TrajectoryEnumerator
 
 // Performs simulation for a batch of all virtual meteoroids
 // Expects that all buffers points to device-accessible memory and have valid sizes
-template <uint32_t STEPS>
 void BatchedAdams(BasicSolver::MeteoroidEnumerator &problems, real dt, real timeout,
                   const IFunctional &functional, ISimulationRecorder &results,
 
-                  size_t iterations_per_batch, size_t threads_per_block,
-
-                  int32_t *dev_active_meteorites, VirtualMeteoroid *dev_problems,
-                  ThreadContext<STEPS> *dev_contexts, Record *dev_records,
-                
-                  const std::array<cudaStream_t, 2> &streams,
-                  const std::array<cudaEvent_t, 2> &copy_events,
-                  const std::array<cudaEvent_t, 2> &kernel_events,
-                  const std::array<uint8_t *, 2> &pinned_buffers)
+                  const PedanticCudaSolver::DeviceContext &context,
+                  size_t adams_steps, size_t iterations_per_batch, size_t threads_per_block)
 {
   assert(dt > (real)0.0);
-  assert(timeout > dt * STEPS);
+  assert(timeout > dt * adams_steps);
   assert(threads_per_block > 0);
   assert(iterations_per_batch > 0);
 
@@ -140,76 +156,86 @@ void BatchedAdams(BasicSolver::MeteoroidEnumerator &problems, real dt, real time
     });
   };
 
+  const auto dev_active_meteorites = context.counter.get();
+  const auto dev_meteoroids = context.meteoroids.get();
+  const auto dev_thread_contexts = (ThreadContext *)context.thread_contexts.get();
+  const auto dev_records = context.records.get();
+  const auto pinned_records = context.pinned_buffers;
+
   // Process all virtual meteoroids by batches
   const VirtualMeteoroid *meteoroids = nullptr;
   size_t n_meteoroids = 0;
   while (problems.MoveNext(meteoroids, n_meteoroids))
   {
+    assert(n_meteoroids <= context.batch_size);
     size_t half_size = n_meteoroids * iterations_per_batch;
     std::vector<UniquePtr> records;
 
     // Re-initialize buffers
-    HANDLE_ERROR(cudaMemset(dev_contexts, 0, sizeof(ThreadContext<STEPS>) * n_meteoroids));
+    HANDLE_ERROR(cudaMemset(dev_thread_contexts, 0,
+                            SizeOfThreadContext(adams_steps) * n_meteoroids));
 
     int32_t active_meteorites = n_meteoroids;
     HANDLE_ERROR(cudaMemcpy(dev_active_meteorites, &active_meteorites,
                             sizeof(int32_t), cudaMemcpyHostToDevice));
-    HANDLE_ERROR(cudaMemcpy(dev_problems, meteoroids,
+    HANDLE_ERROR(cudaMemcpy(dev_meteoroids, meteoroids,
                             sizeof(VirtualMeteoroid) * n_meteoroids, cudaMemcpyHostToDevice));
 
     // The first step of pipeline
     int iter = 0;
 
-    BatchedAdamsKernel<STEPS>(dev_contexts, dev_active_meteorites,
-                              dev_problems, n_meteoroids, dt, timeout,
-                              dev_records + iter * half_size,
-                              iterations_per_batch, threads_per_block, streams[iter]);
-    HANDLE_ERROR(cudaEventRecord(kernel_events[iter], streams[iter]));
-    HANDLE_ERROR(cudaMemcpyAsync(pinned_buffers[iter],
+    BatchedAdamsKernel(dev_thread_contexts, dev_active_meteorites,
+                       dev_meteoroids, n_meteoroids, adams_steps, dt, timeout,
+                       dev_records + iter * half_size,
+                       iterations_per_batch, threads_per_block, context.streams[iter]);
+    HANDLE_ERROR(cudaEventRecord(context.kernel_events[iter], context.streams[iter]));
+    HANDLE_ERROR(cudaMemcpyAsync(pinned_records[iter],
                                  dev_records + iter * half_size,
                                  half_size * sizeof(Record),
-                                 cudaMemcpyDeviceToHost, streams[iter]));
-    HANDLE_ERROR(cudaEventRecord(copy_events[iter], streams[iter]));
+                                 cudaMemcpyDeviceToHost, context.streams[iter]));
+    HANDLE_ERROR(cudaEventRecord(context.copy_events[iter], context.streams[iter]));
 
-    HANDLE_ERROR(cudaEventRecord(copy_events[!iter], streams[!iter]));
+    HANDLE_ERROR(cudaEventRecord(context.copy_events[!iter], context.streams[!iter]));
     futures[!iter] = std::async([](){});
 
     while (active_meteorites > 0)
     {
       iter = !iter;
 
-      HANDLE_ERROR(cudaStreamWaitEvent(streams[iter], copy_events[iter]));
-      HANDLE_ERROR(cudaStreamWaitEvent(streams[iter], kernel_events[!iter]));
-      BatchedAdamsKernel<STEPS>(dev_contexts, dev_active_meteorites,
-                                dev_problems, n_meteoroids, dt, timeout,
-                                dev_records + iter * half_size,
-                                iterations_per_batch, threads_per_block, streams[iter]);
-      HANDLE_ERROR(cudaEventRecord(kernel_events[iter], streams[iter]));
+      HANDLE_ERROR(cudaStreamWaitEvent(context.streams[iter], context.copy_events[iter]));
+      HANDLE_ERROR(cudaStreamWaitEvent(context.streams[iter], context.kernel_events[!iter]));
+      BatchedAdamsKernel(dev_thread_contexts, dev_active_meteorites,
+                         dev_meteoroids, n_meteoroids, adams_steps, dt, timeout,
+                         dev_records + iter * half_size,
+                         iterations_per_batch, threads_per_block, context.streams[iter]);
+      HANDLE_ERROR(cudaEventRecord(context.kernel_events[iter], context.streams[iter]));
 
       futures[iter].wait();
-      HANDLE_ERROR(cudaEventSynchronize(copy_events[!iter]));
-      HANDLE_ERROR(cudaEventSynchronize(kernel_events[iter]));
+      HANDLE_ERROR(cudaEventSynchronize(context.copy_events[!iter]));
+      HANDLE_ERROR(cudaEventSynchronize(context.kernel_events[iter]));
 
       records.emplace_back(allocator.Alloc<Record>(half_size));
-      futures[!iter] = memcpy_async(records.back().get(), pinned_buffers[!iter], half_size * sizeof(Record));
+      futures[!iter] = memcpy_async(records.back().get(), pinned_records[!iter],
+                                    half_size * sizeof(Record));
       HANDLE_ERROR(cudaMemcpy(&active_meteorites, dev_active_meteorites,
                               sizeof(int32_t), cudaMemcpyDeviceToHost));
 
-      HANDLE_ERROR(cudaMemcpyAsync(pinned_buffers[iter],
+      HANDLE_ERROR(cudaMemcpyAsync(pinned_records[iter],
                                    dev_records + iter * half_size,
                                    half_size * sizeof(Record),
-                                   cudaMemcpyDeviceToHost, streams[iter]));
-      HANDLE_ERROR(cudaEventRecord(copy_events[iter], streams[iter]));
+                                   cudaMemcpyDeviceToHost, context.streams[iter]));
+      HANDLE_ERROR(cudaEventRecord(context.copy_events[iter], context.streams[iter]));
     }
 
     // The final step of pipeline
     iter = !iter;
 
     futures[iter].wait();
-    HANDLE_ERROR(cudaEventSynchronize(copy_events[!iter]));
+    HANDLE_ERROR(cudaEventSynchronize(context.copy_events[!iter]));
 
     records.emplace_back(allocator.Alloc<Record>(half_size));
-    futures[!iter] = memcpy_async(records.back().get(), pinned_buffers[!iter], half_size * sizeof(Record));
+    futures[!iter] = memcpy_async(records.back().get(), pinned_records[!iter],
+                                  half_size * sizeof(Record));
     futures[!iter].wait();
 
     HANDLE_ERROR(cudaDeviceSynchronize());
@@ -268,51 +294,52 @@ void BatchedAdams(BasicSolver::MeteoroidEnumerator &problems, real dt, real time
 //--- CudaSolver ---
 //------------------
 
-PedanticCudaSolver::PedanticCudaSolver(PedanticCudaSolverConfig config)
-  : config_(config)
+PedanticCudaSolver::PedanticCudaSolver(PedanticCudaConfig config)
+  : config_(config), context_{ new DeviceContext() }
 {
   int device = 0;
   HANDLE_ERROR(cudaGetDevice(&device));
   HANDLE_ERROR(cudaGetDeviceProperties(&props_, device));
-  size_t batch_size = BatchSize();
+  context_->batch_size = BatchSize();
 
-  HANDLE_ERROR(cudaStreamCreate(&streams_[0]));
-  HANDLE_ERROR(cudaStreamCreate(&streams_[1]));
-  HANDLE_ERROR(cudaEventCreate(&copy_events_[0]));
-  HANDLE_ERROR(cudaEventCreate(&copy_events_[1]));
-  HANDLE_ERROR(cudaEventCreate(&kernel_events_[0]));
-  HANDLE_ERROR(cudaEventCreate(&kernel_events_[1]));
+  HANDLE_ERROR(cudaStreamCreate(&context_->streams[0]));
+  HANDLE_ERROR(cudaStreamCreate(&context_->streams[1]));
+  HANDLE_ERROR(cudaEventCreate(&context_->copy_events[0]));
+  HANDLE_ERROR(cudaEventCreate(&context_->copy_events[1]));
+  HANDLE_ERROR(cudaEventCreate(&context_->kernel_events[0]));
+  HANDLE_ERROR(cudaEventCreate(&context_->kernel_events[1]));
 
-  size_t half_size = batch_size * config.iterations_per_block * sizeof(Record);
-  HANDLE_ERROR(cudaMallocHost(&pinned_buffers_[0], half_size));
-  HANDLE_ERROR(cudaMallocHost(&pinned_buffers_[1], half_size));
+  size_t half_size = context_->batch_size * config.iterations_per_block * sizeof(Record);
+  HANDLE_ERROR(cudaMallocHost(&context_->pinned_buffers[0], half_size));
+  HANDLE_ERROR(cudaMallocHost(&context_->pinned_buffers[1], half_size));
 
-  HANDLE_ERROR(CudaAlloc(buffer_counter_, sizeof(int32_t)));
-  HANDLE_ERROR(CudaAlloc(buffer_problems_, batch_size * sizeof(VirtualMeteoroid)));
-  HANDLE_ERROR(CudaAlloc(buffer_contexts_, batch_size * sizeof(ThreadContext<3>)));
+  HANDLE_ERROR(CudaAlloc(context_->counter, 1));
+  HANDLE_ERROR(CudaAlloc(context_->meteoroids, context_->batch_size));
+  HANDLE_ERROR(CudaAlloc(context_->thread_contexts,
+                         context_->batch_size * SizeOfThreadContext(3 /* the actual N is unknown */)));
 
-  // Double record buffer for 2 CUDA streams
-  HANDLE_ERROR(CudaAlloc(buffer_records_, half_size * 2));
+  // Double record buffer for two CUDA streams
+  HANDLE_ERROR(CudaAlloc(context_->records, context_->batch_size * config.iterations_per_block * 2));
 }
 
 PedanticCudaSolver::~PedanticCudaSolver()
 {
   try
   {
-    buffer_counter_.reset();
-    buffer_problems_.reset();
-    buffer_contexts_.reset();
-    buffer_records_.reset();
+    context_->counter.reset();
+    context_->meteoroids.reset();
+    context_->thread_contexts.reset();
+    context_->records.reset();
 
-    cudaFreeHost(pinned_buffers_[0]);
-    cudaFreeHost(pinned_buffers_[1]);
+    cudaFreeHost(context_->pinned_buffers[0]);
+    cudaFreeHost(context_->pinned_buffers[1]);
 
-    cudaStreamDestroy(streams_[0]);
-    cudaStreamDestroy(streams_[1]);
-    cudaEventDestroy(copy_events_[0]);
-    cudaEventDestroy(copy_events_[1]);
-    cudaEventDestroy(kernel_events_[0]);
-    cudaEventDestroy(kernel_events_[1]);
+    cudaStreamDestroy(context_->streams[0]);
+    cudaStreamDestroy(context_->streams[1]);
+    cudaEventDestroy(context_->copy_events[0]);
+    cudaEventDestroy(context_->copy_events[1]);
+    cudaEventDestroy(context_->kernel_events[0]);
+    cudaEventDestroy(context_->kernel_events[1]);
   }
   catch (std::exception &)
   {
@@ -329,31 +356,6 @@ void PedanticCudaSolver::SolveAny(MeteoroidEnumerator &problems,
                                   const IFunctional &functional,
                                   ISimulationRecorder &results)
 {
-  // Perform simulations
-  auto method = [&](auto contexts)
-  {
-    BatchedAdams(problems, Dt(), Timeout(), functional, results,
-                 config_.iterations_per_block, config_.threads_per_block,
-                 (int32_t *)buffer_counter_.get(), (VirtualMeteoroid *)buffer_problems_.get(),
-                 contexts, (Record *)buffer_records_.get(),
-                 streams_, copy_events_, kernel_events_, pinned_buffers_);
-  };
-
-  switch (Algorithm())
-  {
-    case NumericalAlgorithm::ONE_STEP_ADAMS:
-      method((ThreadContext<1> *)buffer_contexts_.get());
-      break;
-
-    case NumericalAlgorithm::TWO_STEP_ADAMS:
-      method((ThreadContext<2> *)buffer_contexts_.get());
-      break;
-
-    case NumericalAlgorithm::THREE_STEP_ADAMS:
-      method((ThreadContext<3> *)buffer_contexts_.get());
-      break;
-
-    default:
-      assert(false);
-  }
+  BatchedAdams(problems, Dt(), Timeout(), functional, results,
+               *context_, Steps(), config_.iterations_per_block, config_.threads_per_block);
 }
