@@ -24,17 +24,17 @@ class Innisfree : public BasicMeteorite
     Innisfree()
     {
       // Object No 285
-      std::vector<double> time = { 0.00, 0.60, 1.20,
-                                   1.80, 2.20, 2.60,
-                                   3.00, 3.32, 3.82 };
+      std::vector<real> time = { 0.00, 0.60, 1.20,
+                                 1.80, 2.20, 2.60,
+                                 3.00, 3.32, 3.82 };
 
-      std::vector<double> h    = { 58.8, 50.8, 42.8,
-                                   35.0, 30.2, 25.9,
-                                   22.6, 21.7, 19.8 };
+      std::vector<real> h    = { 58.8, 50.8, 42.8,
+                                 35.0, 30.2, 25.9,
+                                 22.6, 21.7, 19.8 };
 
-      std::vector<double> v    = { 14.5, 14.4, 14.2,
-                                   13.4, 12.4, 10.4,
-                                    7.2,  5.3,  2.7 };
+      std::vector<real> v    = { 14.5, 14.4, 14.2,
+                                 13.4, 12.4, 10.4,
+                                 7.2,  5.3,  2.7 };
       for (auto &r : h) { r *= 1000; }
       for (auto &r : v) { r *= 1000; }
       SetTrajectory(time, v, h);

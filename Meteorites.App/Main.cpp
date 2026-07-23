@@ -17,9 +17,9 @@
 #include "Meteorites.KnowledgeBase/PossibleParameters.h"
 
 #if defined(METEORITES_CUDA)
-  #include "Meteorites.CudaSolvers/PedanticCudaSolver.h"
+  #include "Meteorites.CudaSolvers/Pedantic/PedanticCudaSolver.h"
+  #include "Meteorites.CudaSolvers/Fast/FastCudaSolver.h"
 #endif
-#include "Meteorites.CudaSolvers/FastCudaSolver.h"
 
 #include "Exporters/MeanStdevExporter.h"
 #include "Exporters/TrajectoryExporter.h"

@@ -14,8 +14,8 @@ double CFunctional::Compute(size_t num, const real *v, const real *h) const
   size_t n = std::min(num, time.size());
   for (size_t i = 0; i < n; i++)
   {
-    auto dv = std::abs((v_ref[i] - v[i]) / v_ref[0]);
-    auto dh = std::abs((h_ref[i] - h[i]) / h_ref[0]);
+    double dv = std::abs((v_ref[i] - v[i]) / v_ref[0]);
+    double dh = std::abs((h_ref[i] - h[i]) / h_ref[0]);
     
     max_v_error = std::max(max_v_error, dv);
     max_h_error = std::max(max_h_error, dh);

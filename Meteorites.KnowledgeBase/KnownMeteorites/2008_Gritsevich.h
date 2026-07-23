@@ -23,14 +23,14 @@ class Pribram : public BasicMeteorite
 
     Pribram()
     {
-      std::vector<double> time = { 0,      0.856,  1.732,
-                                   2.494,  2.692,  3.0676 };
+      std::vector<real> time = { 0,      0.856,  1.732,
+                                 2.494,  2.692,  3.0676 };
 
-      std::vector<double> h    = { 88.594, 76.318, 63.837,
-                                   52.97,  50.164, 44.858 };
+      std::vector<real> h    = { 88.594, 76.318, 63.837,
+                                 52.97,  50.164, 44.858 };
 
-      std::vector<double> v    = { 20.887, 20.86,  20.838,
-                                   20.773, 20.717, 20.459 };
+      std::vector<real> v    = { 20.887, 20.86,  20.838,
+                                 20.773, 20.717, 20.459 };
 
       for (auto &r : h) { r *= 1000; }
       for (auto &r : v) { r *= 1000; }
