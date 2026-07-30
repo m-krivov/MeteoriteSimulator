@@ -28,49 +28,41 @@ __device__ inline void PrintWarpMask(const char *message)
 
 
 template <uint32_t STEPS>
-__device__ void InitContext(Adams::Layer *steps,
+__device__ void InitContext(Adams::Layer &curr_layer, Adams::Layer *steps,
                             const VirtualMeteoroid &meteoroid,
                             real dt)
 {
-  Adams::SetLayer(steps[STEPS], meteoroid,
-                  meteoroid.V0, meteoroid.Gamma0, meteoroid.h0, meteoroid.l0, meteoroid.M0);
-
-  Adams::OneStepIteration(steps[STEPS - 1], steps[STEPS], meteoroid, dt);
+  curr_layer = { meteoroid.V0, meteoroid.Gamma0, meteoroid.h0, meteoroid.l0, meteoroid.M0 };
+  Adams::OneStepIteration(curr_layer, steps[0], meteoroid, dt);
 
   if constexpr (STEPS >= 2)
-  {
-    Adams::TwoStepIteration(steps[STEPS - 2], steps[STEPS - 1],
-                            steps[STEPS], meteoroid, dt);
-  }
+    Adams::TwoStepIteration(curr_layer, steps[1], steps[0], meteoroid, dt);
 
   if constexpr (STEPS >= 3)
-  {
-    Adams::ThreeStepIteration(steps[STEPS - 3], steps[STEPS - 2],
-                              steps[STEPS - 1], steps[STEPS], meteoroid, dt);
-  }
+    Adams::ThreeStepIteration(curr_layer, steps[2], steps[1], steps[0], meteoroid, dt);
 }
 
 template <uint32_t STEPS>
 __device__ inline bool
 AdamsStep(const real *timestamps, const uint32_t n_timestamps,
           const real dt, const real timeout,
-          Adams::Layer *steps, TrajectoryPoint *points, uint32_t &timestamp,
+          Adams::Layer &curr_layer, Adams::Layer *steps,
+          TrajectoryPoint *points, uint32_t &timestamp,
           uint32_t &nxt, const VirtualMeteoroid &meteoroid, real &t)
 {
   if (timestamp < n_timestamps && t >= timestamps[timestamp])
   {
-    const auto &step = steps[(nxt + 1) % (STEPS + 1)];
-    points[timestamp] = { step.V, step.h };
+    points[timestamp] = { curr_layer.V, curr_layer.h };
     timestamp++;
   }
 
-  Adams::Iteration<STEPS>(steps, meteoroid, nxt, dt);
+  Adams::Iteration<STEPS>(curr_layer, steps, meteoroid, nxt, dt);
 
   t += dt;
 
-  nxt = (nxt + STEPS) % (STEPS + 1);
+  nxt = (nxt + 1) % STEPS;
 
-  if (steps[nxt].M <= (real)0.01 || steps[nxt].h <= (real)0.0 || t >= timeout)
+  if (curr_layer.M <= (real)0.01 || curr_layer.h <= (real)0.0 || t >= timeout)
   {
     return false;
   }
@@ -153,7 +145,8 @@ FastAdamsKernel(const uint64_t *seeds,
   // Trajectory points for currently simulating meteoroid
   TrajectoryPoint *points = context_points + tid * n_timestamps;
 
-  Adams::Layer steps[STEPS + 1];
+  Adams::Layer curr_layer;
+  Adams::Layer steps[STEPS];
   real         t;
   uint32_t     timestamp;
   uint32_t     nxt;
@@ -169,8 +162,8 @@ FastAdamsKernel(const uint64_t *seeds,
 
     t = dt * STEPS;
     timestamp = 0;
-    nxt = STEPS;
-    InitContext<STEPS>(steps, meteoroid, dt);
+    nxt = 0;
+    InitContext<STEPS>(curr_layer, steps, meteoroid, dt);
     }
 
     while (true)
@@ -178,8 +171,8 @@ FastAdamsKernel(const uint64_t *seeds,
 #ifdef DISPLAY_WARP_DIVERGENCE
       PrintWarpMask("ADAMS_STEP: ");
 #endif
-      if (!AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, steps, points,
-                            timestamp, nxt, meteoroid, t)) 
+      if (!AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, curr_layer, steps,
+                            points, timestamp, nxt, meteoroid, t)) 
       { break; }
     }
 #ifdef DISPLAY_WARP_DIVERGENCE
@@ -231,7 +224,8 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
   // Trajectory points for currently simulating meteoroid
   TrajectoryPoint *points = context_points + tid * n_timestamps;
 
-  Adams::Layer steps[STEPS + 1];
+  Adams::Layer curr_layer;
+  Adams::Layer steps[STEPS];
   real         t;
   uint32_t     timestamp;
   uint32_t     nxt;
@@ -247,8 +241,8 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
 
   t = dt * STEPS;
   timestamp = 0;
-  nxt = STEPS;
-  InitContext<STEPS>(steps, meteoroid, dt);
+  nxt = 0;
+  InitContext<STEPS>(curr_layer, steps, meteoroid, dt);
   }
 
   // Main cicle
@@ -257,8 +251,8 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
 #ifdef DISPLAY_WARP_DIVERGENCE
     PrintWarpMask("ADAMS_STEP: ");
 #endif
-    if (AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, steps, points,
-                         timestamp, nxt, meteoroid, t))
+    if (AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, curr_layer, steps,
+                         points, timestamp, nxt, meteoroid, t))
     { continue; }
     else
     {
@@ -279,8 +273,8 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
 
       t = dt * STEPS;
       timestamp = 0;
-      nxt = STEPS;
-      InitContext<STEPS>(steps, meteoroid, dt);
+      nxt = 0;
+      InitContext<STEPS>(curr_layer, steps, meteoroid, dt);
       }
     }
   }
