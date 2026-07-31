@@ -36,37 +36,105 @@ __device__ void InitContext(Adams::Layer &curr_layer, Adams::Layer *steps,
   Adams::OneStepIteration(curr_layer, steps[0], meteoroid, dt);
 
   if constexpr (STEPS >= 2)
+  {
     Adams::TwoStepIteration(curr_layer, steps[1], steps[0], meteoroid, dt);
+  }
 
   if constexpr (STEPS >= 3)
+  {
     Adams::ThreeStepIteration(curr_layer, steps[2], steps[1], steps[0], meteoroid, dt);
+  }
 }
 
-template <uint32_t STEPS>
+template <uint32_t STEPS, typename... LAYERS>
 __device__ inline bool
 AdamsStep(const real *timestamps, const uint32_t n_timestamps,
           const real dt, const real timeout,
-          Adams::Layer &curr_layer, Adams::Layer *steps,
           TrajectoryPoint *points, uint32_t &timestamp,
-          uint32_t &nxt, const VirtualMeteoroid &meteoroid, real &t)
+          const VirtualMeteoroid &meteoroid, real &t,
+          Adams::Layer &curr_layer, Adams::Layer &curr_step, const LAYERS&... prev_steps)
 {
+  static_assert(sizeof...(LAYERS) == STEPS - 1);
+  static_assert((std::is_same_v<LAYERS, Adams::Layer> && ...));
+
   if (timestamp < n_timestamps && t >= timestamps[timestamp])
   {
     points[timestamp] = { curr_layer.V, curr_layer.h };
     timestamp++;
   }
 
-  Adams::Iteration<STEPS>(curr_layer, steps, meteoroid, nxt, dt);
+  auto t_ = std::forward_as_tuple(prev_steps...);
+  if constexpr (STEPS == 1)
+  {
+    Adams::OneStepIteration(curr_layer, curr_step, meteoroid, dt);
+  }
+
+  else if constexpr (STEPS == 2)
+  {
+    Adams::TwoStepIteration(curr_layer, curr_step, std::get<0>(t_), meteoroid, dt);
+  }
+
+  else if constexpr (STEPS == 3)
+  {
+    Adams::ThreeStepIteration(curr_layer, curr_step, std::get<0>(t_), std::get<1>(t_), meteoroid, dt);
+  }
 
   t += dt;
-
-  nxt = (nxt + 1) % STEPS;
 
   if (curr_layer.M <= (real)0.01 || curr_layer.h <= (real)0.0 || t >= timeout)
   {
     return false;
   }
   return true;
+}
+
+// Perform STEPS Adams steps to unroll cicle of steps[STEPS] local array usage
+template <uint32_t STEPS>
+__device__ inline bool
+AdamsCicle(const real *timestamps, const uint32_t n_timestamps,
+           const real dt, const real timeout,
+           Adams::Layer &curr_layer, Adams::Layer *steps,
+           TrajectoryPoint *points, uint32_t &timestamp,
+           const VirtualMeteoroid &meteoroid, real &t)
+{
+  if constexpr (STEPS == 1)
+  {
+    if (!AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, points, timestamp, meteoroid, t,
+                          curr_layer, steps[0]))
+    { return false; }
+
+    return true;
+  }
+
+  else if constexpr (STEPS == 2)
+  {
+    if (!AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, points, timestamp, meteoroid, t,
+                          curr_layer, steps[0], steps[1]))
+    { return false; }
+
+    if (!AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, points, timestamp, meteoroid, t,
+                          curr_layer, steps[1], steps[0]))
+    { return false; }
+
+    return true;
+  }
+
+  else if constexpr (STEPS == 3)
+  {
+    if (!AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, points, timestamp, meteoroid, t,
+                          curr_layer, steps[0], steps[2], steps[1]))
+    { return false; }
+
+    if (!AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, points, timestamp, meteoroid, t,
+                          curr_layer, steps[1], steps[0], steps[2]))
+    { return false; }
+
+    if (!AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, points, timestamp, meteoroid, t,
+                          curr_layer, steps[2], steps[1], steps[0]))
+    { return false; }
+
+    return true;
+  }
 }
 
 __device__ inline real
@@ -149,7 +217,6 @@ FastAdamsKernel(const uint64_t *seeds,
   Adams::Layer steps[STEPS];
   real         t;
   uint32_t     timestamp;
-  uint32_t     nxt;
 
   // Main cicle
   for (uint32_t i = 0; i < meteoroids_per_thread; i++)
@@ -162,7 +229,6 @@ FastAdamsKernel(const uint64_t *seeds,
 
     t = dt * STEPS;
     timestamp = 0;
-    nxt = 0;
     InitContext<STEPS>(curr_layer, steps, meteoroid, dt);
     }
 
@@ -171,8 +237,8 @@ FastAdamsKernel(const uint64_t *seeds,
 #ifdef DISPLAY_WARP_DIVERGENCE
       PrintWarpMask("ADAMS_STEP: ");
 #endif
-      if (!AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, curr_layer, steps,
-                            points, timestamp, nxt, meteoroid, t)) 
+      if (!AdamsCicle<STEPS>(timestamps, n_timestamps, dt, timeout, curr_layer, steps,
+                             points, timestamp, meteoroid, t))
       { break; }
     }
 #ifdef DISPLAY_WARP_DIVERGENCE
@@ -228,7 +294,6 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
   Adams::Layer steps[STEPS];
   real         t;
   uint32_t     timestamp;
-  uint32_t     nxt;
 
   __shared__ uint32_t meteoroids_counter;
   if (threadIdx.x == 0) meteoroids_counter = 0;
@@ -241,7 +306,6 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
 
   t = dt * STEPS;
   timestamp = 0;
-  nxt = 0;
   InitContext<STEPS>(curr_layer, steps, meteoroid, dt);
   }
 
@@ -251,8 +315,9 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
 #ifdef DISPLAY_WARP_DIVERGENCE
     PrintWarpMask("ADAMS_STEP: ");
 #endif
-    if (AdamsStep<STEPS>(timestamps, n_timestamps, dt, timeout, curr_layer, steps,
-                         points, timestamp, nxt, meteoroid, t))
+//may be not balanced now
+    if (AdamsCicle<STEPS>(timestamps, n_timestamps, dt, timeout, curr_layer, steps,
+                          points, timestamp, meteoroid, t))
     { continue; }
     else
     {
@@ -273,7 +338,6 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
 
       t = dt * STEPS;
       timestamp = 0;
-      nxt = 0;
       InitContext<STEPS>(curr_layer, steps, meteoroid, dt);
       }
     }

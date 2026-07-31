@@ -162,7 +162,7 @@ int main()
   try
   {
     // Stage 1.
-    // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteoroids, select 'STAGE1_N_TOTAL' best of them
+    // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteoroids, select 'STAGE1_N_TOP' best of them
     std::cout << "Stage 1. Computing huge amount of virtual meteoroids with low precision";
     std::cout << std::endl;
     std::cout << "     Meteoroids: " << STAGE1_N_TOTAL   << " pcs" << std::endl;
