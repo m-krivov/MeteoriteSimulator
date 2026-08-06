@@ -22,14 +22,14 @@ class MeteoroidsManager
 
     void UpdateTopMeteoroids();
 
-    real GetActualBorderDeviation();
+    real GetActualThresholdDeviation();
 
     std::vector<std::pair<VirtualMeteoroid, real> >
     GetTopMeteoroids(const TrajectoryPoint &ref_point0);
   
   private:
-    // Top m_bests meteoroids are placed in the same memory block
-    // as deviations buffer for GPU to simplify sorting between butch runs
+    // Top m_bests meteoroids share one memory block with deviations buffer
+    // on GPU to simplify sorting between batch launches
     CudaPtr<MeteoroidDeviation> coalesced_deviations_;
     CudaPtr<uint64_t>           coalesced_seeds_;
     CudaPtr<uint64_t>     device_seeds_;

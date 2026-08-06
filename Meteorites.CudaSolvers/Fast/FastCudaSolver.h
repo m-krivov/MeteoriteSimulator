@@ -10,15 +10,15 @@ struct FastCudaSolverConfig
   uint32_t meteoroids_per_thread = 4096 * 4;
   
   // How many CUDA threads must be spawned per each block
-  // Will be used to configure the grid for a CUDA kernel
+  // Will be used to configure the grid for the CUDA kernel
   uint32_t threads_per_block = 64;
 
   // How many blocks must be spawned per each CUDA streaming multiprocessor
   // Large numbers can lead to high memory usage
   uint32_t blocks_per_sm = 8;
 
-  // Size of local arrays of the best meteorites for each thread
-  // MUST be constexpr static for using as template parameter
+  // Size of the local array of best meteoroids per thread
+  // MUST be constexpr static to be used as template parameter
   constexpr static uint32_t best_meteoroids_per_thread = 4;
 
   FastCudaSolverConfig() = default;
@@ -26,7 +26,6 @@ struct FastCudaSolverConfig
   FastCudaSolverConfig &operator =(const FastCudaSolverConfig &) = default;
 };
 
-// Version performing calculations
 class FastCudaSolver
 {
   public:

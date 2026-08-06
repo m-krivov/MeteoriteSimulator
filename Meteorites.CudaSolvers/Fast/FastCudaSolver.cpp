@@ -24,7 +24,7 @@ FastCudaSolver::~FastCudaSolver()
   }
 }
 
-// How many meteorites must be simulated at one kernel call
+// Number of meteoroids simulated per kernel launch
 size_t FastCudaSolver::BatchSize() const
 {
   return config_.meteoroids_per_thread * config_.threads_per_block * config_.blocks_per_sm * props_.multiProcessorCount;
@@ -75,8 +75,8 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
 
   // Prepare device buffers
   MeteoroidsManager meteoroids_manager(m_bests, total_threads, config_.best_meteoroids_per_thread);
-  // Looks not clear :(
-  // But if we move all buffers to MeteoroidsManager, it will become FastCudaSolver
+  // Looks unclear :(
+  // However, moving all buffers into MeteoroidsManager would turn it into FastCudaSolver
   TrajectoryPoint ref_point0;
   {
   size_t n_timestamps;
@@ -99,7 +99,7 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
                           sizeof(real) * n_timestamps_, cudaMemcpyHostToDevice));
   }
 
-  // Batchs cicle
+  // Batches loop
   while (n_meteoroids > 0)
   {
     meteoroids_manager.GenerateSeeds();
@@ -107,9 +107,9 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
     // Launch kernel
     cudaEvent_t start, stop;
     float elapsedTime;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);    
+    HANDLE_ERROR(cudaEventCreate(&start));
+    HANDLE_ERROR(cudaEventCreate(&stop));
+    HANDLE_ERROR(cudaEventRecord(start, 0));    
 
     switch (Algorithm())
     {
@@ -118,7 +118,7 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
             (meteoroids_manager.GetDeviceSeeds(), timestamps_.get(), n_timestamps_,
              reference_points_.get(), context_points_.get(), dt_, timeout_,
              meteoroids_manager.GetDeviceDeviationsBuffer(),
-             meteoroids_manager.GetActualBorderDeviation(),
+             meteoroids_manager.GetActualThresholdDeviation(),
              config_.meteoroids_per_thread,
              config_.blocks_per_sm * props_.multiProcessorCount, config_.threads_per_block);
         break;
@@ -128,7 +128,7 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
             (meteoroids_manager.GetDeviceSeeds(), timestamps_.get(), n_timestamps_,
              reference_points_.get(), context_points_.get(), dt_, timeout_,
              meteoroids_manager.GetDeviceDeviationsBuffer(),
-             meteoroids_manager.GetActualBorderDeviation(),
+             meteoroids_manager.GetActualThresholdDeviation(),
              config_.meteoroids_per_thread,
              config_.blocks_per_sm * props_.multiProcessorCount, config_.threads_per_block);
         break;
@@ -138,7 +138,7 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
             (meteoroids_manager.GetDeviceSeeds(), timestamps_.get(), n_timestamps_,
              reference_points_.get(), context_points_.get(), dt_, timeout_,
              meteoroids_manager.GetDeviceDeviationsBuffer(),
-             meteoroids_manager.GetActualBorderDeviation(),
+             meteoroids_manager.GetActualThresholdDeviation(),
              config_.meteoroids_per_thread,
              config_.blocks_per_sm * props_.multiProcessorCount, config_.threads_per_block);
         break;
@@ -147,20 +147,21 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
         assert(false);
     }
 
-    cudaEventRecord(stop,0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&elapsedTime, start, stop);
+    // TODO: pretty statistical output
+    HANDLE_ERROR(cudaEventRecord(stop,0));
+    HANDLE_ERROR(cudaEventSynchronize(stop));
+    HANDLE_ERROR(cudaEventElapsedTime(&elapsedTime, start, stop));
     printf("Batch time by GPU: %.2lf sec\nSpeed:%.2lf mln/sec\n",
         (double)elapsedTime / 1000, ((double)BatchSize() / 1000000) / ((double)elapsedTime / 1000));
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
+    HANDLE_ERROR(cudaEventDestroy(start));
+    HANDLE_ERROR(cudaEventDestroy(stop));
 
     meteoroids_manager.UpdateTopMeteoroids();
 
     n_meteoroids -= BatchSize();
 
-    printf("%.2lf mln meteoroids left. Achieved border deviation: %f\n\n",
-        (double)n_meteoroids / 1000000, meteoroids_manager.GetActualBorderDeviation());
+    printf("%.2lf mln meteoroids left. Achieved threshold deviation: %f\n\n",
+        (double)n_meteoroids / 1000000, meteoroids_manager.GetActualThresholdDeviation());
   }
 
   return meteoroids_manager.GetTopMeteoroids(ref_point0);

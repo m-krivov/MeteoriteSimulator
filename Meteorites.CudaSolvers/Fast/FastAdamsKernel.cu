@@ -88,10 +88,10 @@ AdamsStep(const real *timestamps, const uint32_t n_timestamps,
   return true;
 }
 
-// Perform STEPS Adams steps to unroll cicle of steps[STEPS] local array usage
+// Performs STEPS Adams steps to unroll the loop over the local steps[STEPS] array
 template <uint32_t STEPS>
 __device__ inline bool
-AdamsCicle(const real *timestamps, const uint32_t n_timestamps,
+AdamsCycle(const real *timestamps, const uint32_t n_timestamps,
            const real dt, const real timeout,
            Adams::Layer &curr_layer, Adams::Layer *steps,
            TrajectoryPoint *points, uint32_t &timestamp,
@@ -157,9 +157,9 @@ ComputeL2(const TrajectoryPoint *points, const TrajectoryPoint *ref_points,
 template<uint32_t BESTS_PER_THREAD>
 __device__ void
 InsertToTopSmallest(MeteoroidDeviation *devs, const MeteoroidDeviation &dev,
-                    const real border_dev = std::numeric_limits<real>::max())
+                    const real threshold_dev = std::numeric_limits<real>::max())
 {
-  if (dev.dev > devs[BESTS_PER_THREAD - 1].dev || dev.dev > border_dev)
+  if (dev.dev > devs[BESTS_PER_THREAD - 1].dev || dev.dev > threshold_dev)
   { return; }
 
   uint32_t pos = 0;
@@ -195,7 +195,7 @@ FastAdamsKernel(const uint64_t *seeds,
                 const real *timestamps, const uint32_t n_timestamps,
                 const TrajectoryPoint *ref_points, TrajectoryPoint *context_points,
                 const real dt, const real timeout,
-                MeteoroidDeviation *global_best_meteoroids, const real border_dev,
+                MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
                 const uint32_t meteoroids_per_thread)
 {
   const uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -210,7 +210,7 @@ FastAdamsKernel(const uint64_t *seeds,
 
   // Meteoroid we are currently simulating
   VirtualMeteoroid  meteoroid;
-  // Trajectory points for currently simulating meteoroid
+  // Trajectory points for currently simulated meteoroid
   TrajectoryPoint *points = context_points + tid * n_timestamps;
 
   Adams::Layer curr_layer;
@@ -218,7 +218,7 @@ FastAdamsKernel(const uint64_t *seeds,
   real         t;
   uint32_t     timestamp;
 
-  // Main cicle
+  // Main loop
   for (uint32_t i = 0; i < meteoroids_per_thread; i++)
   {
     // Init context
@@ -237,15 +237,15 @@ FastAdamsKernel(const uint64_t *seeds,
 #ifdef DISPLAY_WARP_DIVERGENCE
       PrintWarpMask("ADAMS_STEP: ");
 #endif
-      if (!AdamsCicle<STEPS>(timestamps, n_timestamps, dt, timeout, curr_layer, steps,
+      if (!AdamsCycle<STEPS>(timestamps, n_timestamps, dt, timeout, curr_layer, steps,
                              points, timestamp, meteoroid, t))
       { break; }
     }
 #ifdef DISPLAY_WARP_DIVERGENCE
     PrintWarpMask("UPDATE: ");
 #endif
-    real deviation = ComputeL2(points, ref_points, n_timestamps);
-    InsertToTopSmallest<BESTS_PER_THREAD>(local_best_meteoroids, { deviation, generator.GetOffset() });
+    real dev = ComputeL2(points, ref_points, n_timestamps);
+    InsertToTopSmallest<BESTS_PER_THREAD>(local_best_meteoroids, { dev, generator.GetOffset() });
   }
 
   for (uint32_t i = 0; i < BESTS_PER_THREAD; i++)
@@ -272,7 +272,7 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
                         const real *timestamps, const uint32_t n_timestamps,
                         const TrajectoryPoint *ref_points, TrajectoryPoint *context_points,
                         const real dt, const real timeout,
-                        MeteoroidDeviation *global_best_meteoroids, const real border_dev,
+                        MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
                         const uint32_t meteoroids_per_thread)
 {
   const uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -287,7 +287,7 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
 
   // Meteoroid we are currently simulating
   VirtualMeteoroid  meteoroid;
-  // Trajectory points for currently simulating meteoroid
+  // Trajectory points for currently simulated meteoroid
   TrajectoryPoint *points = context_points + tid * n_timestamps;
 
   Adams::Layer curr_layer;
@@ -309,14 +309,13 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
   InitContext<STEPS>(curr_layer, steps, meteoroid, dt);
   }
 
-  // Main cicle
+  // Main loop
   while (true)
   {
 #ifdef DISPLAY_WARP_DIVERGENCE
     PrintWarpMask("ADAMS_STEP: ");
 #endif
-//may be not balanced now
-    if (AdamsCicle<STEPS>(timestamps, n_timestamps, dt, timeout, curr_layer, steps,
+    if (AdamsCycle<STEPS>(timestamps, n_timestamps, dt, timeout, curr_layer, steps,
                           points, timestamp, meteoroid, t))
     { continue; }
     else
@@ -324,8 +323,8 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
 #ifdef DISPLAY_WARP_DIVERGENCE
       PrintWarpMask("UPDATE: ");
 #endif
-      real deviation = ComputeL2(points, ref_points, n_timestamps);
-      InsertToTopSmallest<BESTS_PER_THREAD>(local_best_meteoroids, { deviation, generator.GetOffset() });
+      real dev = ComputeL2(points, ref_points, n_timestamps);
+      InsertToTopSmallest<BESTS_PER_THREAD>(local_best_meteoroids, { dev, generator.GetOffset() });
 
       if (atomicAdd(&meteoroids_counter, 1) >= meteoroids_per_thread * blockDim.x)
       { break; }
@@ -356,7 +355,7 @@ void FastAdamsKernel(const uint64_t *seeds,
                      const real *timestamps, const uint32_t n_timestamps,
                      const TrajectoryPoint *reference_points, TrajectoryPoint *context_points,
                      const real dt, const real timeout,
-                     MeteoroidDeviation *global_best_meteoroids, const real border_dev,
+                     MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
                      const uint32_t meteoroids_per_thread,
 
                      const size_t blocks_num, const size_t threads_per_block)
@@ -366,18 +365,18 @@ void FastAdamsKernel(const uint64_t *seeds,
 
   FastAdamsKernel<STEPS, BEST_METEOROIDS_PER_THREAD><<<blocks_num, threads_per_block>>>
     (seeds, timestamps, n_timestamps, reference_points, context_points, dt, timeout,
-     global_best_meteoroids, border_dev, meteoroids_per_thread);
+     global_best_meteoroids, threshold_dev, meteoroids_per_thread);
 
   HANDLE_ERROR(cudaDeviceSynchronize());
 }
 
-// Template-specified functions compiles only this way (C++ moment)
+// Explicit template instantiations are required (C++ moment)
 template void FastAdamsKernel<1u, FastCudaSolverConfig::best_meteoroids_per_thread>
     (const uint64_t *seeds,
      const real *timestamps, const uint32_t n_timestamps,
      const TrajectoryPoint *reference_points, TrajectoryPoint *context_points,
      const real dt, const real timeout,
-     MeteoroidDeviation *global_best_meteoroids, const real border_dev,
+     MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
      const uint32_t meteoroids_per_thread,
      const size_t blocks_num, const size_t threads_per_block);
 template void FastAdamsKernel<2u, FastCudaSolverConfig::best_meteoroids_per_thread>
@@ -385,7 +384,7 @@ template void FastAdamsKernel<2u, FastCudaSolverConfig::best_meteoroids_per_thre
      const real *timestamps, const uint32_t n_timestamps,
      const TrajectoryPoint *reference_points, TrajectoryPoint *context_points,
      const real dt, const real timeout,
-     MeteoroidDeviation *global_best_meteoroids, const real border_dev,
+     MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
      const uint32_t meteoroids_per_thread,
      const size_t blocks_num, const size_t threads_per_block);
 template void FastAdamsKernel<3u, FastCudaSolverConfig::best_meteoroids_per_thread>
@@ -393,6 +392,6 @@ template void FastAdamsKernel<3u, FastCudaSolverConfig::best_meteoroids_per_thre
      const real *timestamps, const uint32_t n_timestamps,
      const TrajectoryPoint *reference_points, TrajectoryPoint *context_points,
      const real dt, const real timeout,
-     MeteoroidDeviation *global_best_meteoroids, const real border_dev,
+     MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
      const uint32_t meteoroids_per_thread,
      const size_t blocks_num, const size_t threads_per_block);
