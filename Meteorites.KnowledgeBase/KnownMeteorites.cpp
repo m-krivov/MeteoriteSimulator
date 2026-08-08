@@ -76,7 +76,7 @@ const std::vector<std::shared_ptr<const IMeteorite>> KnownMeteorites::Get(std::s
     bool name_is_ok = name.empty() || meteorite->Name() == name;
     bool doi_is_ok = doi.empty() || meteorite->DOI() == doi;
     if (name_is_ok && doi_is_ok)
-    { result.emplace_back(meteorite.get()); }
+    { result.emplace_back(meteorite); }
   }
   return result;
 }
