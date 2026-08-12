@@ -2,6 +2,9 @@
 #include "Meteorites.Core/Defs.h"
 
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
+//#include <thrust/device_ptr.h>
+//#include <thrust/sort.h>
 
 // Retarget helper functions to device
 #if defined(__CUDA_ARCH__)
@@ -44,3 +47,24 @@ cudaError CudaAlloc(CudaPtr<T> &ptr, size_t count)
   ptr.reset(tmp);
   return ret;
 }
+
+// For target parameters of meteoroid. Easy to add new parameters.
+// Maybe we should use this throughout the code
+class TrajectoryPoint
+{
+  public:
+    real v;
+    real h;
+};
+
+// Needed to avoid storage and sorting curandState in kernel.
+// Seeds for generator can be defined after kernel execution
+// but we have to add them to this struct before global sorting
+class MeteoroidDeviation
+{
+  public:
+    real     dev;
+    // Raw offset for curand_init. DOESN'T displays the number
+    // of generated meteoroid
+    uint64_t curand_offset; 
+};

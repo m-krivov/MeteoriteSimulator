@@ -1,4 +1,4 @@
-#include "IterationAllocator.h"
+#include "Meteorites.CudaSolvers/IterationAllocator.h"
 #include "PedanticCudaSolver.h"
 
 #include "BatchedAdamsKernel.h"

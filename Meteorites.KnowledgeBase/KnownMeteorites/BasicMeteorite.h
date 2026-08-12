@@ -21,9 +21,9 @@ class BasicMeteorite : public IMeteorite
   protected:
     BasicMeteorite() = default;
 
-    void SetTrajectory(const std::vector<double> &time,
-                       const std::vector<double> &v,
-                       const std::vector<double> &h)
+    void SetTrajectory(const std::vector<real> &time,
+                       const std::vector<real> &v,
+                       const std::vector<real> &h)
     {
       assert(!time.empty());
       assert(time.size() == v.size());

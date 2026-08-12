@@ -42,12 +42,6 @@ struct Layer
   real h       = (real)0.0;
   real l       = (real)0.0;
   real M       = (real)0.0;
-    
-  real fV      = (real)0.0;
-  real fGamma  = (real)0.0;
-  real fh      = (real)0.0;
-  real fl      = (real)0.0;
-  real fM      = (real)0.0;
 
   Layer() = default;
   Layer(const Layer &) = default;
@@ -55,89 +49,85 @@ struct Layer
 };
 
 
-// Computes the right part of Stulov's ODE and simply assign the values
+// Computes the right part of Stulov's ODE (derivatives of Layer fields)
 static inline DEVICE
-void SetLayer(Layer &layer, const Unchangeable &params,
-              real V, real Gamma, real h, real l, real M)
+void ComputeDLayer(Layer &dlayer, const Layer &layer, const Unchangeable &params)
 {
   assert(params.Rho > 0.0f);
   assert(params.H > 1e-3f);
-  assert(V > 0.0f);
+  assert(layer.V > 0.0f);
 
-  layer.V     = V;
-  layer.Gamma = Gamma;
-  layer.h     = h;
-  layer.l     = l;
-  layer.M     = M;
-
-  if (M <= (real)0.0)   // probably, 'dt' is too large
+  if (layer.M <= (real)0.0)   // probably, 'dt' is too large
   {
-    layer.fV = layer.fh = layer.fl = layer.fM = (real)0.0;
+    dlayer.V = dlayer.h = dlayer.l = dlayer.M = (real)0.0;
   }
   else
   {
-    auto sin_gamma = std::sin(Gamma);
-    auto cos_gamma = std::cos(Gamma);
-    auto g = Constants::g(h);
-    auto rho_a = Constants::RhoAtm(h);
-    auto midsection = Constants::Midsection(M, params.Rho);
+    auto sin_gamma = std::sin(layer.Gamma);
+    auto cos_gamma = std::cos(layer.Gamma);
+    auto g = Constants::g(layer.h);
+    auto rho_a = Constants::RhoAtm(layer.h);
+    auto midsection = Constants::Midsection(layer.M, params.Rho);
 
-    layer.fV = - params.Cd * rho_a * V * V * midsection / (2 * M)
+    dlayer.V = - params.Cd * rho_a * layer.V * layer.V * midsection / (2 * layer.M)
                + g * sin_gamma;
-    layer.fGamma =  + g * cos_gamma / V
-                    - V * cos_gamma / params.R
-                    - params.Cl * rho_a * V * midsection / (2 * M);
-    layer.fh = - V * sin_gamma;
-    layer.fl = V * (params.R / (params.R + h)) * cos_gamma;
-    layer.fM = - (params.Ch * rho_a * V * V * V * midsection / 2) / params.H;
+    dlayer.Gamma =  + g * cos_gamma / layer.V
+                    - layer.V * cos_gamma / params.R
+                    - params.Cl * rho_a * layer.V * midsection / (2 * layer.M);
+    dlayer.h = - layer.V * sin_gamma;
+    dlayer.l = layer.V * (params.R / (params.R + layer.h)) * cos_gamma;
+    dlayer.M = - (params.Ch * rho_a * layer.V * layer.V * layer.V * midsection / 2) / params.H;
   }
 }
 
 
 // Iteration for one-step Adam's method
 static inline DEVICE
-void OneStepIteration(Layer &res, const Layer &f0,
+void OneStepIteration(Layer &layer0, Layer &dlayer0,
                       const Unchangeable &params, real dt)
 {
-  SetLayer(res, params,
-           f0.V     + f0.fV     * dt,
-           f0.Gamma + f0.fGamma * dt,
-           f0.h     + f0.fh     * dt,
-           f0.l     + f0.fl     * dt,
-           f0.M     + f0.fM     * dt);
+  ComputeDLayer(dlayer0, layer0, params);
+
+  layer0 = { layer0.V     + dlayer0.V     * dt,
+             layer0.Gamma + dlayer0.Gamma * dt,
+             layer0.h     + dlayer0.h     * dt,
+             layer0.l     + dlayer0.l     * dt,
+             layer0.M     + dlayer0.M     * dt };
 }
 
 // Iteration for two-step Adam's method
 static inline DEVICE
-void TwoStepIteration(Layer &res, const Layer &f1, const Layer &f0,
+void TwoStepIteration(Layer &layer1, Layer &dlayer1, const Layer &dlayer0,
                       const Unchangeable &params, real dt)
 {
-  const auto c1 =  (real)1.5;
-  const auto c0 = -(real)0.5;
-  
-  SetLayer(res, params,
-           f1.V     + ( c1 * f1.fV     + c0 * f0.fV     ) * dt,
-           f1.Gamma + ( c1 * f1.fGamma + c0 * f0.fGamma ) * dt,
-           f1.h     + ( c1 * f1.fh     + c0 * f0.fh     ) * dt,
-           f1.l     + ( c1 * f1.fl     + c0 * f0.fl     ) * dt,
-           f1.M     + ( c1 * f1.fM     + c0 * f0.fM     ) * dt);
+  constexpr auto c1 =  (real)1.5;
+  constexpr auto c0 = -(real)0.5;
+
+  ComputeDLayer(dlayer1, layer1, params);
+
+  layer1 = { layer1.V     + ( c1 * dlayer1.V     + c0 * dlayer0.V     ) * dt,
+             layer1.Gamma + ( c1 * dlayer1.Gamma + c0 * dlayer0.Gamma ) * dt,
+             layer1.h     + ( c1 * dlayer1.h     + c0 * dlayer0.h     ) * dt,
+             layer1.l     + ( c1 * dlayer1.l     + c0 * dlayer0.l     ) * dt,
+             layer1.M     + ( c1 * dlayer1.M     + c0 * dlayer0.M     ) * dt };
 }
 
 // Iteration for three-step Adam's method
 static inline DEVICE
-void ThreeStepIteration(Layer &res, const Layer &f2, const Layer &f1, const Layer &f0,
+void ThreeStepIteration(Layer &layer2, Layer &dlayer2, const Layer &dlayer1, const Layer &dlayer0,
                         const Unchangeable &params, real dt)
 {
   constexpr auto c2 =  (real)23 / 12;
   constexpr auto c1 = -(real)16 / 12;
   constexpr auto c0 =  (real)5  / 12;
+
+  ComputeDLayer(dlayer2, layer2, params);
   
-  SetLayer(res, params,
-           f2.V     + ( c2 * f2.fV     + c1 * f1.fV     + c0 * f0.fV     ) * dt,
-           f2.Gamma + ( c2 * f2.fGamma + c1 * f1.fGamma + c0 * f0.fGamma ) * dt,
-           f2.h     + ( c2 * f2.fh     + c1 * f1.fh     + c0 * f0.fh     ) * dt,
-           f2.l     + ( c2 * f2.fl     + c1 * f1.fl     + c0 * f0.fl     ) * dt,
-           f2.M     + ( c2 * f2.fM     + c1 * f1.fM     + c0 * f0.fM     ) * dt);
+  layer2 = { layer2.V     + ( c2 * dlayer2.V     + c1 * dlayer1.V     + c0 * dlayer0.V     ) * dt,
+             layer2.Gamma + ( c2 * dlayer2.Gamma + c1 * dlayer1.Gamma + c0 * dlayer0.Gamma ) * dt,
+             layer2.h     + ( c2 * dlayer2.h     + c1 * dlayer1.h     + c0 * dlayer0.h     ) * dt,
+             layer2.l     + ( c2 * dlayer2.l     + c1 * dlayer1.l     + c0 * dlayer0.l     ) * dt,
+             layer2.M     + ( c2 * dlayer2.M     + c1 * dlayer1.M     + c0 * dlayer0.M     ) * dt };
 }
 
 
@@ -146,37 +136,37 @@ void ThreeStepIteration(Layer &res, const Layer &f2, const Layer &f1, const Laye
 template <unsigned int STEPS>
 struct _IterationImpl
 {
-  template <typename LAYERS>
-  static DEVICE void Perform(LAYERS &f, const Unchangeable &params, size_t nxt, real dt);
+  template <typename LAYER>
+  static DEVICE void Perform(LAYER &l, LAYER (&f)[STEPS], const Unchangeable &params, size_t nxt, real dt);
 };
 template <>
 struct _IterationImpl<1>
 {
-  template <typename LAYERS>
-  static DEVICE void Perform(LAYERS &f, const Unchangeable &params, size_t nxt, real dt)
-  { OneStepIteration(f[nxt], f[(nxt + 1) & 1], params, dt); }
+  template <typename LAYER>
+  static DEVICE void Perform(LAYER &l, LAYER f[], const Unchangeable &params, size_t nxt, real dt)
+  { OneStepIteration(l, f[nxt], params, dt); }
 };
 template <>
 struct _IterationImpl<2>
 {
-  template <typename LAYERS>
-  static DEVICE void Perform(LAYERS &f, const Unchangeable &params, size_t nxt, real dt)
-  { TwoStepIteration(f[nxt], f[(nxt + 1) % 3], f[(nxt + 2) % 3], params, dt); }
+  template <typename LAYER>
+  static DEVICE void Perform(LAYER &l, LAYER f[], const Unchangeable &params, size_t nxt, real dt)
+  { TwoStepIteration(l, f[nxt], f[(nxt + 1) % 2], params, dt); }
 };
 template <>
 struct _IterationImpl<3>
 {
-  template <typename LAYERS>
-  static DEVICE void Perform(LAYERS &f, const Unchangeable &params, size_t nxt, real dt)
-  { ThreeStepIteration(f[nxt], f[(nxt + 1) & 3], f[(nxt + 2) & 3], f[(nxt + 3) & 3], params, dt); }
+  template <typename LAYER>
+  static DEVICE void Perform(LAYER &l, LAYER f[], const Unchangeable &params, size_t nxt, real dt)
+  { ThreeStepIteration(l, f[nxt], f[(nxt + 2) % 3], f[(nxt + 1) % 3], params, dt); }
 };
 
 
 // Performs uni-step iteration of Adams' method using a cycled buffer with layers
-template <unsigned int STEPS, typename LAYERS = std::array<Layer, STEPS + 1>>
+template <unsigned int STEPS, typename LAYER>
 static inline DEVICE
-void Iteration(LAYERS &f, const Unchangeable &params, size_t nxt, real dt)
-{ _IterationImpl<STEPS>::Perform(f, params, nxt, dt); }
+void Iteration(LAYER &l, LAYER f[STEPS], const Unchangeable &params, size_t nxt, real dt)
+{ _IterationImpl<STEPS>::Perform(l, f, params, nxt, dt); }
 
 
 } // namespace Adams

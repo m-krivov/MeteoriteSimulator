@@ -23,9 +23,9 @@ class Chelyabinsk : public BasicMeteorite
 
     Chelyabinsk()
     {
-      std::vector<double> time = { 1.07,  6.97,  10.46, 12.24, 13.18, 14.18, 15.17 };
-      std::vector<double> v    = { 19.03, 19.05, 19.03, 18.9,  18.0,  14.2,  6 };
-      std::vector<double> h    = { 95.0,  60.0,  40.0,  30.0,  25.0,  20.0,  17.2 };
+      std::vector<real> time = { 1.07,  6.97,  10.46, 12.24, 13.18, 14.18, 15.17 };
+      std::vector<real> v    = { 19.03, 19.05, 19.03, 18.9,  18.0,  14.2,  6 };
+      std::vector<real> h    = { 95.0,  60.0,  40.0,  30.0,  25.0,  20.0,  17.2 };
 
       for (auto &r : v) { r *= 1000; }
       for (auto &r : h) { r *= 1000;}

@@ -7,7 +7,7 @@ class IMeteorite
 {
   public:
     IMeteorite(const IMeteorite &) = delete;
-    IMeteorite operator =(const IMeteorite &) = delete;
+    IMeteorite &operator =(const IMeteorite &) = delete;
     virtual ~IMeteorite() { }
 
     // Research paper with details about the meteorite
