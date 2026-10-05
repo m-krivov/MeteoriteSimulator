@@ -7,49 +7,27 @@ namespace
 {
 
 template <unsigned int STEPS>
-__device__ void InitContext(ThreadContext<STEPS> &ctx, const VirtualMeteoroid &meteoroid, real dt, size_t idx,
+__device__ void InitContext(ThreadContext<STEPS> &ctx, const VirtualMeteoroid &meteoroid, real dt,
                             Record *&record)
 {
   Adams::Unchangeable params(meteoroid);
-  Adams::SetLayer(ctx.steps[STEPS], params,
-                  meteoroid.V0, meteoroid.Gamma0, meteoroid.h0, meteoroid.l0, meteoroid.M0);
-  *record = { 0.0,
-              ctx.steps[STEPS].M,
-              ctx.steps[STEPS].V,
-              ctx.steps[STEPS].h,
-              ctx.steps[STEPS].l,
-              ctx.steps[STEPS].Gamma };
+  ctx.curr_layer = { meteoroid.V0, meteoroid.Gamma0, meteoroid.h0, meteoroid.l0, meteoroid.M0 };
+  *record = Record(0.0, ctx.curr_layer);
   record++;
 
-  Adams::OneStepIteration(ctx.steps[STEPS - 1], ctx.steps[STEPS], params, dt);
-  *record = { dt,
-              ctx.steps[STEPS - 1].M,
-              ctx.steps[STEPS - 1].V,
-              ctx.steps[STEPS - 1].h,
-              ctx.steps[STEPS - 1].l,
-              ctx.steps[STEPS - 1].Gamma };
+  Adams::OneStepIteration(ctx.curr_layer, ctx.steps[0], params, dt);
+  *record = Record(dt, ctx.curr_layer);
   record++;
+
   if constexpr (STEPS >= 2) {
-    Adams::TwoStepIteration(ctx.steps[STEPS - 2], ctx.steps[STEPS - 1],
-                            ctx.steps[STEPS], params, dt);
-    *record = { dt * 2,
-                ctx.steps[STEPS - 2].M,
-                ctx.steps[STEPS - 2].V,
-                ctx.steps[STEPS - 2].h,
-                ctx.steps[STEPS - 2].l,
-                ctx.steps[STEPS - 2].Gamma };
+    Adams::TwoStepIteration(ctx.curr_layer, ctx.steps[1], ctx.steps[0], params, dt);
+    *record = Record(dt * 2, ctx.curr_layer);
     record++;
   }
 
   if constexpr (STEPS >= 3) {
-    Adams::ThreeStepIteration(ctx.steps[STEPS - 3], ctx.steps[STEPS - 2],
-                              ctx.steps[STEPS - 1], ctx.steps[STEPS], params, dt);
-    *record = { dt * 3,
-                ctx.steps[STEPS - 3].M,
-                ctx.steps[STEPS - 3].V,
-                ctx.steps[STEPS - 3].h,
-                ctx.steps[STEPS - 3].l,
-                ctx.steps[STEPS - 3].Gamma };
+    Adams::ThreeStepIteration(ctx.curr_layer, ctx.steps[2], ctx.steps[1], ctx.steps[0], params, dt);
+    *record = Record(dt * 3, ctx.curr_layer);
     record++;
   }
 }
@@ -82,9 +60,9 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_thre
   Adams::Unchangeable params(meteoroid);
   if (ctx.t == 0.0) // new meteoroid
   {
-    InitContext(ctx, meteoroid, dt, idx, record);
+    InitContext(ctx, meteoroid, dt, record);
     t = dt * (real)STEPS;
-    nxt = STEPS;
+    nxt = 0;
     timestamp = 0;
     iters_count = STEPS + 1;
   }
@@ -104,22 +82,19 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_thre
     // If necessery, update the functional's arguments
     if (timestamp < n_timestamps && t >= timestamps[timestamp])
     {
-      const auto& step = ctx.steps[(nxt + 1) % (STEPS + 1)];
-      V_arg[timestamp] = step.V;
-      h_arg[timestamp] = step.h;
+      V_arg[timestamp] = ctx.curr_layer.V;
+      h_arg[timestamp] = ctx.curr_layer.h;
       timestamp++;
     }
 
     // Compute values for the next step, store them
-    Adams::Iteration<STEPS>(ctx.steps, params, nxt, dt);
-    auto M = ctx.steps[nxt].M;
-    auto h = ctx.steps[nxt].h;
+    Adams::Iteration<STEPS>(ctx.curr_layer, ctx.steps, params, nxt, dt);
 
     t += dt;
-    *record = {t, M, ctx.steps[nxt].V, h, ctx.steps[nxt].l, ctx.steps[nxt].Gamma};
+    *record = Record(t, ctx.curr_layer);
 
     // Should we stop the simulation?
-    if (M <= (real)0.01 || h <= (real)0.0 || t >= timeout)
+    if (ctx.curr_layer.M <= (real)0.01 || ctx.curr_layer.h <= (real)0.0 || t >= timeout)
     {
       record->t = 0.0; // stop marker
       ctx.t = 0.0;
@@ -129,7 +104,7 @@ __global__ void AdamsKernel(ThreadContext<STEPS> *contexts, int32_t *active_thre
     }
     iters_count++;
     record++;
-    nxt = (nxt + STEPS) % (STEPS + 1);
+    nxt = (nxt + 1) % STEPS;
   }
 
   // Update context

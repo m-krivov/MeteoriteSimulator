@@ -17,33 +17,27 @@ void AdamsMethod(const VirtualMeteoroid &problem, const IFunctional &functional,
 
   // Prepare the initial state and coefficients, verify them
   Adams::Unchangeable params(problem);
-  std::array<Adams::Layer, STEPS + 1> steps;
+  Adams::Layer curr_layer = { problem.V0, problem.Gamma0, problem.h0, problem.l0, problem.M0 };
+  Adams::Layer steps[STEPS];
   real t = (real)0.0;
 
   // Compute values for initial steps
-  Adams::SetLayer(steps[STEPS], params,
-                  problem.V0, problem.Gamma0,
-                  problem.h0, problem.l0, problem.M0);
-  t_next = results.Store(t, steps[STEPS].M, steps[STEPS].V,
-                         steps[STEPS].h, steps[STEPS].l, steps[STEPS].Gamma);
+  t_next = results.Store(t, curr_layer.M, curr_layer.V, curr_layer.h, curr_layer.l, curr_layer.Gamma);
 
-  Adams::OneStepIteration(steps[STEPS - 1], steps[STEPS], params, dt);
+  Adams::OneStepIteration(curr_layer, steps[0], params, dt);
   t += dt;
-  t_next = results.Store(t, steps[STEPS - 1].M, steps[STEPS - 1].V,
-                         steps[STEPS - 1].h, steps[STEPS - 1].l, steps[STEPS - 1].Gamma);
+  t_next = results.Store(t, curr_layer.M, curr_layer.V, curr_layer.h, curr_layer.l, curr_layer.Gamma);
   
   if constexpr (STEPS >= 2) {
-    Adams::TwoStepIteration(steps[STEPS - 2], steps[STEPS - 1], steps[STEPS], params, dt);
+    Adams::TwoStepIteration(curr_layer, steps[1], steps[0], params, dt);
     t += dt;
-    t_next = results.Store(t, steps[STEPS - 2].M, steps[STEPS - 2].V,
-                           steps[STEPS - 2].h, steps[STEPS - 2].l, steps[STEPS - 2].Gamma);
+    t_next = results.Store(t, curr_layer.M, curr_layer.V, curr_layer.h, curr_layer.l, curr_layer.Gamma);
   }
 
   if constexpr (STEPS >= 3) {
-    Adams::ThreeStepIteration(steps[STEPS - 3], steps[STEPS - 2], steps[STEPS - 1], steps[STEPS], params, dt);
+    Adams::ThreeStepIteration(curr_layer, steps[2], steps[1], steps[0], params, dt);
     t += dt;
-    t_next = results.Store(t, steps[STEPS - 3].M, steps[STEPS - 3].V,
-                           steps[STEPS - 3].h, steps[STEPS - 3].l, steps[STEPS - 3].Gamma);
+    t_next = results.Store(t, curr_layer.M, curr_layer.V, curr_layer.h, curr_layer.l, curr_layer.Gamma);
   }
 
   // Prepare buffers for values that are wanted by functional
@@ -57,36 +51,33 @@ void AdamsMethod(const VirtualMeteoroid &problem, const IFunctional &functional,
   std::vector<real> V_arg(n_timestamps, (real)0.0f), h_arg(n_timestamps, (real)0.0f);
 
   // The main loop: perform simulation until meteorite is not burnt, collided or timeouted
-  size_t nxt = STEPS;
+  size_t nxt = 0;
   while (t < timeout)
   {
     // If necessery, update the functional's arguments
     if (timestamp < n_timestamps && t >= timestamps[timestamp])
     {
-      const auto &step = steps[(nxt + 1) % (STEPS + 1)];
-      V_arg[timestamp] = step.V;
-      h_arg[timestamp] = step.h;
+      V_arg[timestamp] = curr_layer.V;
+      h_arg[timestamp] = curr_layer.h;
       timestamp += 1;
     }
 
     // Compute values for the next step, store them
-    Adams::Iteration<STEPS>(steps, params, nxt, dt);
-    auto M = steps[nxt].M;
-    auto h = steps[nxt].h;
+    Adams::Iteration<STEPS>(curr_layer, steps, params, nxt, dt);
 
     t += dt;
     if (t >= t_next)
-    { t_next = results.Store(t, M, steps[nxt].V, h, steps[nxt].l, steps[nxt].Gamma); }
-    nxt = (nxt + STEPS) % (STEPS + 1);
+    { t_next = results.Store(t, curr_layer.M, curr_layer.V, curr_layer.h, curr_layer.l, curr_layer.Gamma); }
+    nxt = (nxt + 1) % STEPS;
    
     // Check, should we stop the simulation?
-    if (M <= (real)0.01)
+    if (curr_layer.M <= (real)0.01)
     {
       results.Finished(ISimulationRecorder::Reason::Burnt,
                        functional.Compute(timestamp, &V_arg[0], &h_arg[0]));
       return;
     }
-    if (h <= (real)0.0)
+    if (curr_layer.h <= (real)0.0)
     {
       results.Finished(ISimulationRecorder::Reason::Collided,
                        functional.Compute(timestamp, &V_arg[0], &h_arg[0]));

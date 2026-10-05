@@ -17,7 +17,8 @@
 #include "Meteorites.KnowledgeBase/PossibleParameters.h"
 
 #if defined(METEORITES_CUDA)
-  #include "Meteorites.CudaSolvers/PedanticCudaSolver.h"
+  #include "Meteorites.CudaSolvers/Pedantic/PedanticCudaSolver.h"
+  #include "Meteorites.CudaSolvers/Fast/FastCudaSolver.h"
 #endif
 
 #include "Exporters/MeanStdevExporter.h"
@@ -161,24 +162,18 @@ int main()
   try
   {
     // Stage 1.
-    // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteoroids, select 'STAGE1_N_TOTAL' best of them
+    // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteoroids, select 'STAGE1_N_TOP' best of them
     std::cout << "Stage 1. Computing huge amount of virtual meteoroids with low precision";
     std::cout << std::endl;
     std::cout << "     Meteoroids: " << STAGE1_N_TOTAL   << " pcs" << std::endl;
     std::cout << "     Method:     " << ToString(STAGE1_METHOD) << std::endl;
     std::cout << "     dt:         " << STAGE1_DT << " seconds" << std::endl;
-    std::vector<std::pair<VirtualMeteoroid, double> > stage1_meteoroids;
+    std::vector<std::pair<VirtualMeteoroid, real> > stage1_meteoroids;
     {
-      MonteCarloGenerator generator(meteorite, params, STAGE1_N_TOTAL, SEED);
-      generator.OnProgress(MyProgressBar::Create(), PROGRESS_BAR_STEP);
-      STAGE1_FUNC functional(meteorite);
-      MetaRecorder recorder(STAGE1_N_TOP, STAGE1_N_TOP * 10);
-
-      std::unique_ptr<ISolver> solver = CreateSolver();
+      std::unique_ptr<FastCudaSolver> solver = std::make_unique<FastCudaSolver>();
       solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
-      solver->Solve(generator, functional, recorder);
+      stage1_meteoroids = solver->Solve(*meteorite, STAGE1_N_TOTAL, STAGE1_N_TOP);
     
-      recorder.ExportAndReset(stage1_meteoroids);
       assert(stage1_meteoroids.size() == STAGE1_N_TOP);
     }
     std::cout << std::endl;

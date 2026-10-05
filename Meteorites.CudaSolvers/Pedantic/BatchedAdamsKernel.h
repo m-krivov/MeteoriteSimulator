@@ -12,6 +12,9 @@ struct alignas(32) Record
   real t{}, M{}, V{}, h{}, l{}, Gamma{};
 
   Record() = default;
+  DEVICE Record(real t, const Adams::Layer &layer)
+    : t(t), M(layer.M), V(layer.V), h(layer.h), l(layer.l), Gamma(layer.Gamma)
+  { }
   Record(const Record &) = delete;
   Record &operator =(const Record &) = default;
 
@@ -28,7 +31,8 @@ struct alignas(32) Record
 template <uint32_t STEPS>
 struct ThreadContext
 {
-  Adams::Layer steps[STEPS + 1];
+  Adams::Layer curr_layer;
+  Adams::Layer steps[STEPS];
   VirtualMeteoroid params{};
   size_t nxt{};
   real t{};

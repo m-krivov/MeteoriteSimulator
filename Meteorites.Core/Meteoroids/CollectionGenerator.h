@@ -18,7 +18,7 @@ class CollectionGenerator : public BasicMeteoroidGenerator
     {}
 
     // Version suitable for 'MetaFormatter'
-    CollectionGenerator(const std::vector<std::pair<VirtualMeteoroid, double>> &meteoroids)
+    CollectionGenerator(const std::vector<std::pair<VirtualMeteoroid, real>> &meteoroids)
     {
       meteoroids_.reserve(meteoroids.size());
       for (const auto &[meteoroid, loss] : meteoroids)
