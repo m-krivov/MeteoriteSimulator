@@ -18,6 +18,15 @@ struct Unchangeable
   real Rho = (real)0.0;
   real R   = (real)0.0;
 
+  // Precomputed per-meteoroid constants:
+  // inv_H             = 1 / H
+  // inv_R             = 1 / R
+  // midsection_factor = coeff * Rho^(-2/3), so that
+  //     Midsection(M, Rho) == midsection_factor * M^(2/3)
+  real inv_H             = (real)0.0;
+  real inv_R             = (real)0.0;
+  real midsection_factor = (real)0.0;
+
   Unchangeable() = default;
   DEVICE Unchangeable(const VirtualMeteoroid &problem)
     : H{ problem.H },
@@ -26,7 +35,11 @@ struct Unchangeable
       Cl{ problem.Cl },
       Rho{ problem.Rho },
       R{ Constants::R() }
-  { }
+  {
+    inv_H             = (real)1.0 / H;
+    inv_R             = (real)1.0 / R;
+    midsection_factor = Constants::Midsection((real)1.0, Rho);
+  }
   Unchangeable(const Unchangeable &) = default;
   Unchangeable &operator =(const Unchangeable &) = default;
 };
@@ -57,27 +70,36 @@ void ComputeDLayer(Layer &dlayer, const Layer &layer, const Unchangeable &params
   assert(params.H > 1e-3f);
   assert(layer.V > 0.0f);
 
-  if (layer.M <= (real)0.0)   // probably, 'dt' is too large
-  {
-    dlayer.V = dlayer.h = dlayer.l = dlayer.M = (real)0.0;
-  }
-  else
-  {
-    auto sin_gamma = std::sin(layer.Gamma);
-    auto cos_gamma = std::cos(layer.Gamma);
-    auto g = Constants::g(layer.h);
-    auto rho_a = Constants::RhoAtm(layer.h);
-    auto midsection = Constants::Midsection(layer.M, params.Rho);
+  // Branchless guard for non-positive mass ('dt is too large' case).
+  // In the steady-state hot loop layer.M is always positive (the caller
+  // checks M <= 0.01 after every step), so this path is almost always
+  // inactive. A data-dependent select is cheaper than a branch: it removes
+  // the branch-resolution stall and warp divergence at this point.
+  const bool alive = layer.M > (real)0.0;
+  const real M     = fmax(layer.M, (real)1e-30);
 
-    dlayer.V = - params.Cd * rho_a * layer.V * layer.V * midsection / (2 * layer.M)
-               + g * sin_gamma;
-    dlayer.Gamma =  + g * cos_gamma / layer.V
-                    - layer.V * cos_gamma / params.R
-                    - params.Cl * rho_a * layer.V * midsection / (2 * layer.M);
-    dlayer.h = - layer.V * sin_gamma;
-    dlayer.l = layer.V * (params.R / (params.R + layer.h)) * cos_gamma;
-    dlayer.M = - (params.Ch * rho_a * layer.V * layer.V * layer.V * midsection / 2) / params.H;
-  }
+  auto sin_gamma = std::sin(layer.Gamma);
+  auto cos_gamma = std::cos(layer.Gamma);
+  auto g = Constants::g(layer.h);
+  auto rho_a = Constants::RhoAtm(layer.h);
+  auto midsection = params.midsection_factor * std::pow(M, (real)(2.0 / 3.0));
+  auto inv_2M = (real)0.5 / M;
+
+  const real dl_V = - params.Cd * rho_a * layer.V * layer.V * midsection * inv_2M
+                    + g * sin_gamma;
+  const real dl_G = + g * cos_gamma / layer.V
+                    - layer.V * cos_gamma * params.inv_R
+                    - params.Cl * rho_a * layer.V * midsection * inv_2M;
+  const real dl_h = - layer.V * sin_gamma;
+  const real dl_l = layer.V * (params.R / (params.R + layer.h)) * cos_gamma;
+  const real dl_M = - (params.Ch * rho_a * layer.V * layer.V * layer.V
+                       * midsection * (real)0.5) * params.inv_H;
+
+  dlayer.V     = alive ? dl_V : (real)0.0;
+  dlayer.Gamma = alive ? dl_G : (real)0.0;
+  dlayer.h     = alive ? dl_h : (real)0.0;
+  dlayer.l     = alive ? dl_l : (real)0.0;
+  dlayer.M     = alive ? dl_M : (real)0.0;
 }
 
 
