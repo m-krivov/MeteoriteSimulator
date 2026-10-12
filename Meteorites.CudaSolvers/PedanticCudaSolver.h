@@ -4,8 +4,8 @@
 #include "Meteorites.Core/Solvers/BasicSolver.h"
 
 
-// Settings for CudaSolver
-struct PedanticCudaSolverConfig
+// Settings for PedanticCudaSolver
+struct PedanticCudaConfig
 {
   // How many CUDA threads must be spawned per each block
   // Will be used to configure the grid for a CUDA kernel
@@ -18,17 +18,17 @@ struct PedanticCudaSolverConfig
   // How many blocks must be spawned per each CUDA streaming multiprocessor
   // Large numbers can lead to high memory usage
   size_t blocks_per_sm = 4;
-
-  PedanticCudaSolverConfig() = default;
-  PedanticCudaSolverConfig(const PedanticCudaSolverConfig &) = default;
-  PedanticCudaSolverConfig &operator =(const PedanticCudaSolverConfig &) = default;
 };
 
-// Version for CUDA kernel debugging
+// Version for debugging and testing
+// Provides identical results but works faster than GoldSolver
 class PedanticCudaSolver : public BasicSolver
 {
   public:
-    PedanticCudaSolver(PedanticCudaSolverConfig config = PedanticCudaSolverConfig());
+    // Definition for pImpl
+    struct DeviceContext;
+
+    PedanticCudaSolver(PedanticCudaConfig config = PedanticCudaConfig());
     virtual ~PedanticCudaSolver();
 
   private:
@@ -41,18 +41,6 @@ class PedanticCudaSolver : public BasicSolver
                           ISimulationRecorder &results) override final;
 
     cudaDeviceProp props_{};
-    const PedanticCudaSolverConfig config_{};
-
-    std::array<cudaStream_t, 2> streams_;
-    std::array<cudaEvent_t, 2> copy_events_;
-    std::array<cudaEvent_t, 2> kernel_events_;
-    std::array<uint8_t *, 2> pinned_buffers_;
-
-    CudaPtr<uint8_t> buffer_counter_;
-    CudaPtr<uint8_t> buffer_problems_;
-    CudaPtr<uint8_t> buffer_contexts_;
-    CudaPtr<uint8_t> buffer_records_;
-    CudaPtr<uint8_t> buffer_timestamps_;
-    CudaPtr<uint8_t> buffer_functional_;
-    size_t n_timestamps_{0};    // implicitly defines the size of 'buffer_functional_' and 'buffer_timestamps_'
+    const PedanticCudaConfig config_{};
+    std::shared_ptr<DeviceContext> context_;
 };

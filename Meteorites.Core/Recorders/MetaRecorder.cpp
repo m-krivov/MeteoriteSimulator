@@ -1,5 +1,6 @@
 #include "MetaRecorder.h"
 
+
 MetaRecorder::MetaRecorder(size_t n_best, size_t buffer_size)
   : n_best_(n_best), buffer_size_(buffer_size),
     accuracy_threshold_(std::numeric_limits<double>::max())
@@ -12,7 +13,8 @@ MetaRecorder::MetaRecorder(size_t n_best, size_t buffer_size)
 
 real MetaRecorder::Started(const VirtualMeteoroid &problem)
 {
-  problems_.emplace_back(std::make_pair(problem, std::numeric_limits<double>::max()));
+  assert(!current_.has_value());
+  current_.emplace(problem);
   return std::numeric_limits<real>::max();
 }
 
@@ -24,13 +26,13 @@ real MetaRecorder::Store(real, real, real, real, real, real)
 namespace
 {
 
-void SelectBest(std::vector<std::pair<VirtualMeteoroid, double> > &problems, size_t n_best)
+void SelectBest(std::vector<MeteoroidSummary> &problems, size_t n_best)
 {
   std::sort(problems.begin(), problems.end(),
-            [](const std::pair<VirtualMeteoroid, double> &el1,
-               const std::pair<VirtualMeteoroid, double> &el2) -> bool
+            [](const MeteoroidSummary &el1,
+               const MeteoroidSummary &el2) -> bool
             {
-              return el1.second < el2.second;
+              return el1.Accuracy() < el2.Accuracy();
             });
 
   if (problems.size() > n_best)
@@ -41,28 +43,29 @@ void SelectBest(std::vector<std::pair<VirtualMeteoroid, double> > &problems, siz
 
 void MetaRecorder::Finished(Reason reason, double accuracy)
 {
-  assert(!problems_.empty());
+  assert(current_.has_value());
 
   // If solution is not good enough, simply reject it
   if (problems_.size() > n_best_ && accuracy >= accuracy_threshold_)
   {
-    problems_.pop_back();
+    current_.reset();
     return;
   }
 
   // Otherwise, store solution and update list of the best cases
-  problems_[problems_.size() - 1].second = accuracy;
-  if (problems_.size() >= buffer_size_)
+  problems_.emplace_back(MeteoroidSummary(current_.value(), reason, accuracy));
+  if (problems_.size() > buffer_size_)
   {
     SelectBest(problems_, n_best_);
     assert(problems_.size() == n_best_);
-    accuracy_threshold_ = problems_[problems_.size() - 1].second;
+    accuracy_threshold_ = problems_.back().Accuracy();
   }
+  current_.reset();
 }
 
-void MetaRecorder::ExportAndReset(std::vector<std::pair<VirtualMeteoroid, double> > &results)
+void MetaRecorder::MoveTo(std::vector<MeteoroidSummary> &results)
 {
-  if (problems_.size() >= n_best_)
+  if (problems_.size() > n_best_)
   { SelectBest(problems_, n_best_); }
 
   results = std::move(problems_);

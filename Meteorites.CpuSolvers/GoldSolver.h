@@ -3,7 +3,6 @@
 
 #include "Meteorites.Core/Solvers/BasicSolver.h"
 
-
 // Uses one-step, two-step or three-step Adams method to solve ordinary differential equations
 // May be used to verify more complex solvers with some performance optimizations
 class GoldSolver : public BasicSolver
