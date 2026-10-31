@@ -22,7 +22,15 @@
 #include <unordered_set>
 #include <vector>
 
-typedef double real;
+#if defined(METEORITES_FP64)
+  typedef double real;
+  constexpr std::string_view METEORITES_PRECISION = "FP64";
+#elif defined(METEORITES_FP32)
+  typedef float real;
+  constexpr std::string_view METEORITES_PRECISION = "FP32";
+#else
+  #error The project was not configured properly, METEORITES_PRECISION must be set to either 'fp32' or 'fp64'
+#endif
 
 #if !defined(M_PI)
   constexpr double M_PI = 3.1415926535897932384626433832795;

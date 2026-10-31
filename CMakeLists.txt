@@ -17,19 +17,31 @@ else()
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release)
 endif()
 
-set(METEORITES_CUDA false CACHE BOOL "Enable CUDA-accelerated solvers")
-if(${METEORITES_CUDA})
+set(METEORITES_PRECISION "FP32" CACHE STRING
+    "How many bits per floating point number must be used by default?")
+set_property(CACHE METEORITES_PRECISION PROPERTY STRINGS "FP32" "FP64")
+if(${METEORITES_PRECISION} STREQUAL "FP64")
+  add_compile_definitions(METEORITES_FP64)
+else()
+  add_compile_definitions(METEORITES_FP32)
+endif()
+
+set(METEORITES_FAST_MATH ON CACHE BOOL "Specify the fast-math option for compilers")
+
+set(METEORITES_CUDA OFF CACHE BOOL "Enable CUDA-accelerated solvers")
+if(METEORITES_CUDA)
   set(CMAKE_CUDA_ARCHITECTURES "native")
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
   set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
   add_compile_definitions(METEORITES_CUDA)
+  add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
   include_directories(${CUDAToolkit_INCLUDE_DIRS})
 endif()
 
 set(METEORITES_GNUPLOT false CACHE BOOL "Enable visualization, requires gnuplot to be installed")
-if(${METEORITES_GNUPLOT})
+if(METEORITES_GNUPLOT)
   add_compile_definitions(METEORITES_GNUPLOT)
 endif()
 
@@ -43,7 +55,7 @@ endif()
 macro(find_cpp_sources dir headers cpp cuda)
   file(GLOB_RECURSE ${headers}   ${dir}/*.h)
   file(GLOB_RECURSE ${cpp}       ${dir}/*.cpp)
-  if(${METEORITES_CUDA})
+  if(METEORITES_CUDA)
     file(GLOB_RECURSE cu         ${dir}/*.cu)
     list(APPEND ${cpp} ${cu})
   endif()
@@ -81,6 +93,14 @@ macro(configure_cpp_proj target proj_name)
     endforeach(i)
   endif()
 
+  if(METEORITES_FAST_MATH)
+    target_compile_options(${target} PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-ffast-math>
+                                             $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/fp:fast>)
+    if(METEORITES_CUDA)
+      target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
+    endif()
+  endif()
+
   get_target_property(target_type ${target} TYPE)
   if(target_type STREQUAL "EXECUTABLE" OR
      target_type STREQUAL "SHARED_LIBRARY" OR
@@ -96,7 +116,7 @@ endmacro()
 
 include(DepCache.cmake)
 depcache_googletest(googletest)
-if(${METEORITES_GNUPLOT})
+if(METEORITES_GNUPLOT)
   depcache_matplotpp(matplotpp)
 endif()
 
@@ -108,11 +128,10 @@ find_cpp_sources(${ROOT_DIR}/Meteorites.CpuSolvers METEORITES_CPU_H METEORITES_C
 add_library(Meteorites.CpuSolvers STATIC ${METEORITES_CPU_H} ${METEORITES_CPU_CPP} ${METEORITES_CPU_CU})
 configure_cpp_proj(Meteorites.CpuSolvers "meteorites.cpu")
 
-if(${METEORITES_CUDA})
+if(METEORITES_CUDA)
   find_cpp_sources(${ROOT_DIR}/Meteorites.CudaSolvers METEORITES_CUDA_H METEORITES_CUDA_CPP METEORITES_CUDA_CU)
   add_library(Meteorites.CudaSolvers STATIC ${METEORITES_CUDA_H} ${METEORITES_CUDA_CPP} ${METEORITES_CUDA_CU})
   configure_cpp_proj(Meteorites.CudaSolvers "meteorites.cuda")
-  target_compile_options(Meteorites.CudaSolvers PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 endif()
 
 find_cpp_sources(${ROOT_DIR}/Meteorites.KnowledgeBase METEORITES_KNOWLEDGE_H METEORITES_KNOWLEDGE_CPP METEORITES_KNOWLEDGE_CU)
@@ -121,7 +140,7 @@ configure_cpp_proj(Meteorites.KnowledgeBase "meteorites.knowledge")
 
 find_cpp_sources(${ROOT_DIR}/Meteorites.App METEORITES_APP_H METEORITES_APP_CPP METEORITES_APP_CU)
 add_executable(Meteorites.App ${METEORITES_APP_H} ${METEORITES_APP_CPP} ${METEORITES_APP_CU})
-if(${METEORITES_CUDA})
+if(METEORITES_CUDA)
   target_link_libraries(Meteorites.App Meteorites.CudaSolvers)
 endif()
 configure_cpp_proj(Meteorites.App "meteorites"
@@ -129,7 +148,7 @@ configure_cpp_proj(Meteorites.App "meteorites"
                    Meteorites.CpuSolvers
                    Meteorites.Core
                    indicators)
-if(${METEORITES_GNUPLOT})
+if(METEORITES_GNUPLOT)
   target_link_libraries(Meteorites.App matplotpp)
 endif()
 

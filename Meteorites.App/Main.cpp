@@ -132,6 +132,9 @@ int main()
     std::cout.flush();
   };
 
+  // Some configuration parameters for logging
+  std::cout << "Precision: " << METEORITES_PRECISION << std::endl << std::endl;
+
   // Print all available information about the simulated meteorite
   std::cout << "Meteorite: " << meteorite->Name() << std::endl;
   std::cout << "     Date: " << meteorite->Date() << std::endl;

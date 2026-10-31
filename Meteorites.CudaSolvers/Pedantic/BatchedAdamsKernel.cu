@@ -7,8 +7,7 @@ namespace
 {
 
 template <unsigned int STEPS>
-__device__ void InitContext(ThreadContext &ctx, const VirtualMeteoroid &meteoroid, real dt, size_t idx,
-                            Record *&record)
+__device__ void InitContext(ThreadContext &ctx, const VirtualMeteoroid &meteoroid, real dt, Record *&record)
 {
   Adams::Unchangeable params(meteoroid);
   Adams::SetLayer(ctx.steps[STEPS], params,
@@ -80,7 +79,7 @@ __global__ void AdamsKernel(uint8_t *contexts, int32_t *active_threads,
   Adams::Unchangeable params(meteoroid);
   if (ctx.t == 0.0) // new meteoroid
   {
-    InitContext<STEPS>(ctx, meteoroid, dt, idx, record);
+    InitContext<STEPS>(ctx, meteoroid, dt, record);
     t = dt * (real)STEPS;
     nxt = STEPS;
     iters_count = STEPS + 1;

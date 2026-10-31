@@ -4,7 +4,8 @@
 #include "Meteorites.CpuSolvers/OpenmpSolver.h"
 
 #if defined(METEORITES_CUDA)
-  #include "Meteorites.CudaSolvers/PedanticCudaSolver.h"
+  #include "Meteorites.CudaSolvers/Pedantic/PedanticCudaSolver.h"
+  #include "Meteorites.CudaSolvers/Fast/FastCudaSolver.h"
 #endif
 
 std::unique_ptr<ISolver> Factory::StageOneSolver() const
