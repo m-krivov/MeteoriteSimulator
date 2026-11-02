@@ -5,13 +5,16 @@
 #include "Meteorites.Core/Solvers/Adams.h"
 
 
-// Contains a few values extracted from Adams::Layer
+// Contains a few values extracted from Adams::State
 // They could be passed to formatters
 struct Record
 {
   real t{}, M{}, V{}, h{}, l{}, Gamma{};
 
   Record() = default;
+  DEVICE Record(real t, const Adams::State &state)
+    : t(t), M(state.M), V(state.V), h(state.h), l(state.l), Gamma(state.Gamma)
+  { }
   Record(const Record &) = delete;
   Record &operator =(const Record &) = default;
 
@@ -33,14 +36,15 @@ struct ThreadContext
   size_t nxt{};
   real t{};
   bool ended{};
-  Adams::Layer steps[0];
+  Adams::State curr_layer;
+  Adams::State steps[0];
 };
 
 constexpr size_t SizeOfThreadContext(size_t steps)
 {
   assert(steps >= 1);
   assert(steps <= 3);
-  return sizeof(ThreadContext) + (steps + 1) * sizeof(Adams::Layer);
+  return sizeof(ThreadContext) + steps * sizeof(Adams::State);
 }
 
 

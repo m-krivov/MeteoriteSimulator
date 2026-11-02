@@ -82,7 +82,7 @@ void MeteoroidsManager::UpdateTopMeteoroids()
 
   // Sorting
 
-  // Сauses strange performance drops in the main kernel
+  // Causes strange performance drops in the main kernel
   /*
   auto zip_begin = thrust::make_zip_iterator(thrust::make_tuple(coalesced_deviations_.get(),
                                                                 coalesced_seeds_.get()));
@@ -126,12 +126,12 @@ void MeteoroidsManager::UpdateTopMeteoroids()
                           sizeof(uint64_t) * coalesced_buf_size, cudaMemcpyHostToDevice));
 }
 
-real MeteoroidsManager::GetActualBorderDeviation()
+real MeteoroidsManager::GetActualThresholdDeviation()
 {
-  real border_deviation;
-  HANDLE_ERROR(cudaMemcpy(&border_deviation, coalesced_deviations_.get() + m_bests_ - 1,
+  real threshold_deviation;
+  HANDLE_ERROR(cudaMemcpy(&threshold_deviation, coalesced_deviations_.get() + m_bests_ - 1,
                           sizeof(real), cudaMemcpyDeviceToHost));
-  return border_deviation;
+  return threshold_deviation;
 }
 
 __global__ void RestoreMeteoroidsKernel(VirtualMeteoroid *meteoroids,
