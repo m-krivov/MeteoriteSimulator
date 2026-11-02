@@ -16,6 +16,12 @@ class MeteoroidSummary
     MeteoroidSummary &operator =(MeteoroidSummary &&) noexcept = default;
     MeteoroidSummary &operator =(const MeteoroidSummary &) noexcept = default;
 
+    MeteoroidSummary(const VirtualMeteoroid &meteoroid,
+                     ISimulationRecorder::Reason reason,
+                     double accuracy)
+      : meteoroid_(meteoroid), reason_(reason), accuracy_(accuracy)
+    { assert(accuracy >= 0.0); }
+
     // Returns the original virtual meteoroid used for the simulation
     const VirtualMeteoroid &Meteoroid() const { return meteoroid_; }
 
@@ -34,13 +40,6 @@ class MeteoroidSummary
       recorder.Started(meteoroid_);
       recorder.Finished(reason_, accuracy_);
     }
-
-  protected:
-    MeteoroidSummary(const VirtualMeteoroid &meteoroid,
-                     ISimulationRecorder::Reason reason,
-                     double accuracy)
-      : meteoroid_(meteoroid), reason_(reason), accuracy_(accuracy)
-    { assert(accuracy >= 0.0); }
 
   private:
     VirtualMeteoroid meteoroid_{};

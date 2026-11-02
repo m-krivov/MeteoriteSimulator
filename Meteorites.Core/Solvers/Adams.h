@@ -7,176 +7,164 @@
 namespace Adams
 {
 
-// Caches constants and problem's parameters that may be considered as unchangeable values
-// This class is a thin wrapper for 'Case' and 'Constants'
+// Caches meteoroid's parameters and constants that may be considered as unchangeable values
+// Also precomputes some frequently used expressions
 struct Unchangeable
 {
-  real H   = (real)0.0;
-  real Ch  = (real)0.0;
-  real Cd  = (real)0.0;
-  real Cl  = (real)0.0;
-  real Rho = (real)0.0;
-  real R   = (real)0.0;
+  // Meteoroid's parameters
+  real H          = (real)0.0;
+  real Ch         = (real)0.0;
+  real Cd         = (real)0.0;
+  real Cl         = (real)0.0;
+  real Rho        = (real)0.0;
+
+  // Constants
+  real R          = (real)0.0;
+
+  // Precomputed values
+  real inv_H      = (real)0.0;
+  real inv_R      = (real)0.0;
+  real midsection = (real)0.0;
 
   Unchangeable() = default;
-  DEVICE Unchangeable(const VirtualMeteoroid &problem)
-    : H{ problem.H },
-      Ch{ problem.Ch },
-      Cd{ problem.Cd },
-      Cl{ problem.Cl },
-      Rho{ problem.Rho },
+  DEVICE Unchangeable(const VirtualMeteoroid &meteoroid)
+    : H{ meteoroid.H },
+      Ch{ meteoroid.Ch },
+      Cd{ meteoroid.Cd },
+      Cl{ meteoroid.Cl },
+      Rho{ meteoroid.Rho },
       R{ Constants::R() }
-  { }
+  {
+    inv_H       = (real)1.0 / H;
+    inv_R       = (real)1.0 / R;
+    midsection  = Constants::Midsection((real)1.0, Rho);
+  }
   Unchangeable(const Unchangeable &) = default;
   Unchangeable &operator =(const Unchangeable &) = default;
 };
 
 
-// Represents four primary parameters (velocity, angle, height and mass)
+// Represents four primary ODE's variables (velocity, angle, height and mass)
 // and one auxiliary (length) at some point in time
-// Also contains precomputed right part of Stulov's ODE
-struct Layer
+struct State
 {
   real V       = (real)0.0;
   real Gamma   = (real)0.0;
   real h       = (real)0.0;
   real l       = (real)0.0;
   real M       = (real)0.0;
-    
-  real fV      = (real)0.0;
-  real fGamma  = (real)0.0;
-  real fh      = (real)0.0;
-  real fl      = (real)0.0;
-  real fM      = (real)0.0;
 
-  Layer() = default;
-  Layer(const Layer &) = default;
-  Layer &operator =(const Layer &) = default;
+  State() = default;
+  State(const State &) = default;
+  State &operator =(const State &) = default;
 };
 
 
-// Computes the right part of Stulov's ODE and simply assign the values
-static inline DEVICE
-void SetLayer(Layer &layer, const Unchangeable &params,
-              real V, real Gamma, real h, real l, real M)
+// Computes the right part of Stulov's ODE system
+// These values are equal to derivatives
+inline DEVICE
+void ComputeDerivatives(State &dx, const State &x, const Unchangeable &params)
 {
   assert(params.Rho > 0.0f);
   assert(params.H > 1e-3f);
-  assert(V > 0.0f);
+  assert(x.V > 0.0f);
 
-  layer.V     = V;
-  layer.Gamma = Gamma;
-  layer.h     = h;
-  layer.l     = l;
-  layer.M     = M;
+  // Branchless guard for non-positive mass for cases when dt is too large
+  const bool alive = x.M > (real)0.0;
+  const real M     = std::max(x.M, (real)1e-30);
 
-  if (M <= (real)0.0)   // probably, 'dt' is too large
-  {
-    layer.fV = layer.fh = layer.fl = layer.fM = (real)0.0;
-  }
-  else
-  {
-    auto sin_gamma = std::sin(Gamma);
-    auto cos_gamma = std::cos(Gamma);
-    auto g = Constants::g(h);
-    auto rho_a = Constants::RhoAtm(h);
-    auto midsection = Constants::Midsection(M, params.Rho);
+  auto sin_gamma  = std::sin(x.Gamma);
+  auto cos_gamma  = std::cos(x.Gamma);
+  auto g          = Constants::g(x.h);
+  auto rho_a      = Constants::RhoAtm(x.h);
+  auto midsection = params.midsection * std::pow(M, (real)(2.0 / 3.0));
+  auto inv_2M     = (real)0.5 / M;
 
-    layer.fV = - params.Cd * rho_a * V * V * midsection / (2 * M)
-               + g * sin_gamma;
-    layer.fGamma =  + g * cos_gamma / V
-                    - V * cos_gamma / params.R
-                    - params.Cl * rho_a * V * midsection / (2 * M);
-    layer.fh = - V * sin_gamma;
-    layer.fl = V * (params.R / (params.R + h)) * cos_gamma;
-    layer.fM = - (params.Ch * rho_a * V * V * V * midsection / 2) / params.H;
-  }
+  const real dx_V = - params.Cd * rho_a * x.V * x.V * midsection * inv_2M
+                    + g * sin_gamma;
+  const real dx_G = + g * cos_gamma / x.V
+                    - x.V * cos_gamma * params.inv_R
+                    - params.Cl * rho_a * x.V * midsection * inv_2M;
+  const real dx_h = - x.V * sin_gamma;
+  const real dx_l = x.V * (params.R / (params.R + x.h)) * cos_gamma;
+  const real dx_M = - (params.Ch * rho_a * x.V * x.V * x.V
+                       * midsection * (real)0.5) * params.inv_H;
+
+  dx.V     = alive ? dx_V : (real)0.0;
+  dx.Gamma = alive ? dx_G : (real)0.0;
+  dx.h     = alive ? dx_h : (real)0.0;
+  dx.l     = alive ? dx_l : (real)0.0;
+  dx.M     = alive ? dx_M : (real)0.0;
 }
 
 
 // Iteration for one-step Adam's method
-static inline DEVICE
-void OneStepIteration(Layer &res, const Layer &f0,
+inline DEVICE
+void OneStepIteration(State &x1, State &dx0, const State &x0,
                       const Unchangeable &params, real dt)
 {
-  SetLayer(res, params,
-           f0.V     + f0.fV     * dt,
-           f0.Gamma + f0.fGamma * dt,
-           f0.h     + f0.fh     * dt,
-           f0.l     + f0.fl     * dt,
-           f0.M     + f0.fM     * dt);
+  ComputeDerivatives(dx0, x0, params);
+
+  x1 = { x0.V     + dx0.V     * dt,
+         x0.Gamma + dx0.Gamma * dt,
+         x0.h     + dx0.h     * dt,
+         x0.l     + dx0.l     * dt,
+         x0.M     + dx0.M     * dt };
 }
 
 // Iteration for two-step Adam's method
-static inline DEVICE
-void TwoStepIteration(Layer &res, const Layer &f1, const Layer &f0,
+inline DEVICE
+void TwoStepIteration(State &x2, State &dx1, const State &x1, const State &dx0,
                       const Unchangeable &params, real dt)
 {
-  const auto c1 =  (real)1.5;
-  const auto c0 = -(real)0.5;
-  
-  SetLayer(res, params,
-           f1.V     + ( c1 * f1.fV     + c0 * f0.fV     ) * dt,
-           f1.Gamma + ( c1 * f1.fGamma + c0 * f0.fGamma ) * dt,
-           f1.h     + ( c1 * f1.fh     + c0 * f0.fh     ) * dt,
-           f1.l     + ( c1 * f1.fl     + c0 * f0.fl     ) * dt,
-           f1.M     + ( c1 * f1.fM     + c0 * f0.fM     ) * dt);
+  constexpr auto c1 =  (real)1.5;
+  constexpr auto c0 = -(real)0.5;
+
+  ComputeDerivatives(dx1, x1, params);
+
+  x2 = { x1.V     + ( c1 * dx1.V     + c0 * dx0.V     ) * dt,
+         x1.Gamma + ( c1 * dx1.Gamma + c0 * dx0.Gamma ) * dt,
+         x1.h     + ( c1 * dx1.h     + c0 * dx0.h     ) * dt,
+         x1.l     + ( c1 * dx1.l     + c0 * dx0.l     ) * dt,
+         x1.M     + ( c1 * dx1.M     + c0 * dx0.M     ) * dt };
 }
 
 // Iteration for three-step Adam's method
-static inline DEVICE
-void ThreeStepIteration(Layer &res, const Layer &f2, const Layer &f1, const Layer &f0,
+inline DEVICE
+void ThreeStepIteration(State &x3, State &dx2, const State &x2, const State &dx1, const State &dx0,
                         const Unchangeable &params, real dt)
 {
   constexpr auto c2 =  (real)23 / 12;
   constexpr auto c1 = -(real)16 / 12;
   constexpr auto c0 =  (real)5  / 12;
+
+  ComputeDerivatives(dx2, x2, params);
   
-  SetLayer(res, params,
-           f2.V     + ( c2 * f2.fV     + c1 * f1.fV     + c0 * f0.fV     ) * dt,
-           f2.Gamma + ( c2 * f2.fGamma + c1 * f1.fGamma + c0 * f0.fGamma ) * dt,
-           f2.h     + ( c2 * f2.fh     + c1 * f1.fh     + c0 * f0.fh     ) * dt,
-           f2.l     + ( c2 * f2.fl     + c1 * f1.fl     + c0 * f0.fl     ) * dt,
-           f2.M     + ( c2 * f2.fM     + c1 * f1.fM     + c0 * f0.fM     ) * dt);
+  x3 = { x2.V     + ( c2 * dx2.V     + c1 * dx1.V     + c0 * dx0.V     ) * dt,
+         x2.Gamma + ( c2 * dx2.Gamma + c1 * dx1.Gamma + c0 * dx0.Gamma ) * dt,
+         x2.h     + ( c2 * dx2.h     + c1 * dx1.h     + c0 * dx0.h     ) * dt,
+         x2.l     + ( c2 * dx2.l     + c1 * dx1.l     + c0 * dx0.l     ) * dt,
+         x2.M     + ( c2 * dx2.M     + c1 * dx1.M     + c0 * dx0.M     ) * dt };
 }
 
-
-// Helper to implement partial specialization for a function
-// Enjoy the beaity of modern C++. No, COME BACK AND ENJOY!
+// Performs uni-step iteration of Adams' method using a cycled buffer with derivatives
 template <unsigned int STEPS>
-struct _IterationImpl
-{
-  template <typename LAYERS>
-  static DEVICE void Perform(LAYERS &f, const Unchangeable &params, size_t nxt, real dt);
-};
-template <>
-struct _IterationImpl<1>
-{
-  template <typename LAYERS>
-  static DEVICE void Perform(LAYERS &f, const Unchangeable &params, size_t nxt, real dt)
-  { OneStepIteration(f[nxt], f[(nxt + 1) & 1], params, dt); }
-};
-template <>
-struct _IterationImpl<2>
-{
-  template <typename LAYERS>
-  static DEVICE void Perform(LAYERS &f, const Unchangeable &params, size_t nxt, real dt)
-  { TwoStepIteration(f[nxt], f[(nxt + 1) % 3], f[(nxt + 2) % 3], params, dt); }
-};
-template <>
-struct _IterationImpl<3>
-{
-  template <typename LAYERS>
-  static DEVICE void Perform(LAYERS &f, const Unchangeable &params, size_t nxt, real dt)
-  { ThreeStepIteration(f[nxt], f[(nxt + 1) & 3], f[(nxt + 2) & 3], f[(nxt + 3) & 3], params, dt); }
-};
+inline DEVICE
+void Iteration(State &x, State dx[STEPS], const Unchangeable &params, size_t nxt, real dt);
 
+template<>
+inline DEVICE
+void Iteration<1>(State &x, State dx[1], const Unchangeable &params, size_t nxt, real dt)
+{ OneStepIteration(x, dx[nxt], x, params, dt); }
 
-// Performs uni-step iteration of Adams' method using a cycled buffer with layers
-template <unsigned int STEPS, typename LAYERS = std::array<Layer, STEPS + 1>>
-static inline DEVICE
-void Iteration(LAYERS &f, const Unchangeable &params, size_t nxt, real dt)
-{ _IterationImpl<STEPS>::Perform(f, params, nxt, dt); }
+template<>
+inline DEVICE
+void Iteration<2>(State &x, State dx[2], const Unchangeable &params, size_t nxt, real dt)
+{ TwoStepIteration(x, dx[nxt], x, dx[(nxt + 1) % 2], params, dt); }
 
+template<>
+inline DEVICE
+void Iteration<3>(State &x, State dx[3], const Unchangeable &params, size_t nxt, real dt)
+{ ThreeStepIteration(x, dx[nxt], x, dx[(nxt + 2) % 3], dx[(nxt + 1) % 3], params, dt); }
 
 } // namespace Adams

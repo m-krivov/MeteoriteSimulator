@@ -13,6 +13,7 @@
 #include "Meteorites.Core/Solvers/ISolver.h"
 #include "Meteorites.Core/Meteoroids/CollectionGenerator.h"
 #include "Meteorites.Core/Meteoroids/MonteCarloGenerator.h"
+#include "Meteorites.CudaSolvers/Fast/FastCudaSolver.h"
 #include "Meteorites.KnowledgeBase/KnownMeteorites.h"
 #include "Meteorites.KnowledgeBase/PossibleParameters.h"
 
@@ -155,8 +156,9 @@ int main()
   indicators::show_console_cursor(false);
   try
   {
+#if 1
     // Stage 1.
-    // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteoroids, select 'STAGE1_N_TOTAL' best of them
+    // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteoroids, select 'STAGE1_N_TOP' best of them
     std::cout << "Stage 1. Computing huge amount of virtual meteoroids with low precision";
     std::cout << std::endl;
     std::cout << "     Meteoroids: " << STAGE1_N_TOTAL   << " pcs" << std::endl;
@@ -177,7 +179,29 @@ int main()
       assert(stage1_meteoroids.size() == STAGE1_N_TOP);
     }
     std::cout << std::endl;
-
+#else
+    // Stage 1.
+    // Compute trajectories for 'STAGE1_N_TOTAL' virtual meteoroids, select 'STAGE1_N_TOP' best of them
+    std::cout << "Stage 1. Computing huge amount of virtual meteoroids with low precision";
+    std::cout << std::endl;
+    std::cout << "     Meteoroids: " << STAGE1_N_TOTAL   << " pcs" << std::endl;
+    std::cout << "     Method:     " << ToString(STAGE1_METHOD) << std::endl;
+    std::cout << "     dt:         " << STAGE1_DT << " seconds" << std::endl;
+    std::vector<MeteoroidSummary> stage1_meteoroids;
+    {
+      std::unique_ptr<FastCudaSolver> solver = std::make_unique<FastCudaSolver>();
+      solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
+      auto meteoroids = solver->Solve(*meteorite, STAGE1_N_TOTAL, STAGE1_N_TOP);
+    
+      assert(meteoroids.size() == STAGE1_N_TOP);
+      for (const auto &meteoroid : meteoroids) {
+        stage1_meteoroids.emplace_back(
+          MeteoroidSummary(meteoroid.first, ISimulationRecorder::Reason::NA, (double)meteoroid.second)
+        );
+      }
+    }
+    std::cout << std::endl;
+#endif
     // Stage 2.
     // Recompute them with better precision, store their trajectories
     // After that, sort them again and truncate

@@ -6,7 +6,7 @@
 namespace Beech1995
 {
 
-class Peekskill  : public BasicMeteorite
+class Peekskill : public BasicMeteorite
 {
   public:
     virtual std::string DOI() const override final

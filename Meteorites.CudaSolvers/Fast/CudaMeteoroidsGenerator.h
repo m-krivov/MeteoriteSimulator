@@ -3,7 +3,7 @@
 #include "Meteorites.CudaSolvers/CudaDefs.h"
 #include "Meteorites.Core/Meteoroids/VirtualMeteoroid.h"
 
-// Simple hardcode generator for use in cuda kernels
+// Simple hardcoded generator for use in CUDA kernels
 class CudaMeteoroidsGenerator
 {
   public:
@@ -31,7 +31,7 @@ class CudaMeteoroidsGenerator
       current_offset_ += number_of_parameters;
     }
 
-    // Return actual curand_offset for the last generated meteoroid
+    // Returns the actual curand_offset for the last generated meteoroid
     __device__ uint64_t GetOffset()
     {
       assert(current_offset_ != 0); // No one meteoroid had been generated yet
@@ -41,7 +41,7 @@ class CudaMeteoroidsGenerator
 
   private:
     curandState current_state_;
-    // Raw offset for curand_init. DOESN'T displays the number of the generated meteoroid
+    // Raw offset for curand_init. This does NOT represent the number of generated meteoroids
     uint64_t    current_offset_;
 
     constexpr static uint64_t number_of_parameters = 7;
