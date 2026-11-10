@@ -7,6 +7,13 @@
 namespace Adams
 {
 
+// We add some comments here that explain exactly
+// how the magic constants were derived. Upon merging into `master`,
+// these comments can either be removed or kept for the sake of clarity
+inline constexpr uint32_t FLOPS_PER_ONE_ADAMS_STEP_ITERATION = 52,
+                          FLOPS_PER_TWO_ADAMS_STEP_ITERATION = 67,
+                          FLOPS_PER_THREE_ADAMS_STEP_ITERATION = 77;
+
 // Caches meteoroid's parameters and constants that may be considered as unchangeable values
 // Also precomputes some frequently used expressions
 struct Unchangeable
@@ -27,6 +34,7 @@ struct Unchangeable
   real midsection = (real)0.0;
 
   Unchangeable() = default;
+  // Only 4 flops for the entire trajectory - well within the margin of error
   DEVICE Unchangeable(const VirtualMeteoroid &meteoroid)
     : H{ meteoroid.H },
       Ch{ meteoroid.Ch },
@@ -63,7 +71,7 @@ struct State
 // Computes the right part of Stulov's ODE system
 // These values are equal to derivatives
 inline DEVICE
-void ComputeDerivatives(State &dx, const State &x, const Unchangeable &params)
+void ComputeDerivatives(State &dx, const State &x, const Unchangeable &params) // 42 flops
 {
   assert(params.Rho > 0.0f);
   assert(params.H > 1e-3f);
@@ -73,22 +81,22 @@ void ComputeDerivatives(State &dx, const State &x, const Unchangeable &params)
   const bool alive = x.M > (real)0.0;
   const real M     = std::max(x.M, (real)1e-30);
 
-  auto sin_gamma  = std::sin(x.Gamma);
-  auto cos_gamma  = std::cos(x.Gamma);
-  auto g          = Constants::g(x.h);
-  auto rho_a      = Constants::RhoAtm(x.h);
-  auto midsection = params.midsection * std::pow(M, (real)(2.0 / 3.0));
-  auto inv_2M     = (real)0.5 / M;
+  auto sin_gamma  = std::sin(x.Gamma);                                    // 1
+  auto cos_gamma  = std::cos(x.Gamma);                                    // 1
+  auto g          = Constants::g(x.h);                                    // 5
+  auto rho_a      = Constants::RhoAtm(x.h);                               // 3
+  auto midsection = params.midsection * std::pow(M, (real)(2.0 / 3.0));   // 2
+  auto inv_2M     = (real)0.5 / M;                                        // 1
 
   const real dx_V = - params.Cd * rho_a * x.V * x.V * midsection * inv_2M
-                    + g * sin_gamma;
+                    + g * sin_gamma;                                      // 7
   const real dx_G = + g * cos_gamma / x.V
                     - x.V * cos_gamma * params.inv_R
-                    - params.Cl * rho_a * x.V * midsection * inv_2M;
-  const real dx_h = - x.V * sin_gamma;
-  const real dx_l = x.V * (params.R / (params.R + x.h)) * cos_gamma;
+                    - params.Cl * rho_a * x.V * midsection * inv_2M;      // 10
+  const real dx_h = - x.V * sin_gamma;                                    // 1
+  const real dx_l = x.V * (params.R / (params.R + x.h)) * cos_gamma;      // 4
   const real dx_M = - (params.Ch * rho_a * x.V * x.V * x.V
-                       * midsection * (real)0.5) * params.inv_H;
+                       * midsection * (real)0.5) * params.inv_H;          // 7
 
   dx.V     = alive ? dx_V : (real)0.0;
   dx.Gamma = alive ? dx_G : (real)0.0;
@@ -101,7 +109,7 @@ void ComputeDerivatives(State &dx, const State &x, const Unchangeable &params)
 // Iteration for one-step Adam's method
 inline DEVICE
 void OneStepIteration(State &x1, State &dx0, const State &x0,
-                      const Unchangeable &params, real dt)
+                      const Unchangeable &params, real dt) // 52 flops
 {
   ComputeDerivatives(dx0, x0, params);
 
@@ -109,13 +117,13 @@ void OneStepIteration(State &x1, State &dx0, const State &x0,
          x0.Gamma + dx0.Gamma * dt,
          x0.h     + dx0.h     * dt,
          x0.l     + dx0.l     * dt,
-         x0.M     + dx0.M     * dt };
+         x0.M     + dx0.M     * dt }; // 10
 }
 
 // Iteration for two-step Adam's method
 inline DEVICE
 void TwoStepIteration(State &x2, State &dx1, const State &x1, const State &dx0,
-                      const Unchangeable &params, real dt)
+                      const Unchangeable &params, real dt) // 67 flops
 {
   constexpr auto c1 =  (real)1.5;
   constexpr auto c0 = -(real)0.5;
@@ -126,13 +134,13 @@ void TwoStepIteration(State &x2, State &dx1, const State &x1, const State &dx0,
          x1.Gamma + ( c1 * dx1.Gamma + c0 * dx0.Gamma ) * dt,
          x1.h     + ( c1 * dx1.h     + c0 * dx0.h     ) * dt,
          x1.l     + ( c1 * dx1.l     + c0 * dx0.l     ) * dt,
-         x1.M     + ( c1 * dx1.M     + c0 * dx0.M     ) * dt };
+         x1.M     + ( c1 * dx1.M     + c0 * dx0.M     ) * dt }; // 25
 }
 
 // Iteration for three-step Adam's method
 inline DEVICE
 void ThreeStepIteration(State &x3, State &dx2, const State &x2, const State &dx1, const State &dx0,
-                        const Unchangeable &params, real dt)
+                        const Unchangeable &params, real dt) // 77 flops
 {
   constexpr auto c2 =  (real)23 / 12;
   constexpr auto c1 = -(real)16 / 12;
@@ -144,7 +152,7 @@ void ThreeStepIteration(State &x3, State &dx2, const State &x2, const State &dx1
          x2.Gamma + ( c2 * dx2.Gamma + c1 * dx1.Gamma + c0 * dx0.Gamma ) * dt,
          x2.h     + ( c2 * dx2.h     + c1 * dx1.h     + c0 * dx0.h     ) * dt,
          x2.l     + ( c2 * dx2.l     + c1 * dx1.l     + c0 * dx0.l     ) * dt,
-         x2.M     + ( c2 * dx2.M     + c1 * dx1.M     + c0 * dx0.M     ) * dt };
+         x2.M     + ( c2 * dx2.M     + c1 * dx1.M     + c0 * dx0.M     ) * dt }; // 35
 }
 
 // Performs uni-step iteration of Adams' method using a cycled buffer with derivatives

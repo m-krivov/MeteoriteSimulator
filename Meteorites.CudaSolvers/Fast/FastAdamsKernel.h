@@ -11,4 +11,5 @@ void FastAdamsKernel(const uint64_t *seeds,
                      const real dt, const real timeout,
                      MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
                      const uint32_t meteoroids_per_thread,
-                     const size_t blocks_num, const size_t threads_per_block);
+                     const size_t blocks_num, const size_t threads_per_block,
+                     uint64_t *steps_counters);

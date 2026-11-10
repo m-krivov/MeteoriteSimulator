@@ -45,6 +45,11 @@ if(METEORITES_GNUPLOT)
   add_compile_definitions(METEORITES_GNUPLOT)
 endif()
 
+set(METEORITES_FLOPS_ESTIMATOR OFF CACHE BOOL "Enable FLOPS estimation")
+if(METEORITES_FLOPS_ESTIMATOR)
+  add_compile_definitions(METEORITES_FLOPS_ESTIMATOR)
+endif()
+
 set(ROOT_DIR      "${CMAKE_SOURCE_DIR}")
 set(BIN_DIR       "${ROOT_DIR}/Bin")
 

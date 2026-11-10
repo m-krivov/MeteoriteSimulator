@@ -15,8 +15,8 @@ class MeteoroidsManager
                       size_t best_meteoroids_per_thread);
     ~MeteoroidsManager();
 
-    MeteoroidDeviation* GetDeviceDeviationsBuffer();
-    uint64_t*           GetDeviceSeeds();
+    MeteoroidDeviation *GetDeviceDeviationsBuffer();
+    uint64_t           *GetDeviceSeeds();
 
     void GenerateSeeds();
 

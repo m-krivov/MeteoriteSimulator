@@ -2,6 +2,8 @@
 
 #include "FastAdamsKernel.h"
 #include "MeteoroidsManager.h"
+#include "FlopsEstimator.h"
+#include "Meteorites.Core/Solvers/Adams.h"
 
 FastCudaSolver::FastCudaSolver(FastCudaSolverConfig config)
   : config_(config)
@@ -71,7 +73,32 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
   printf("\nTotal meteoroids: %.2lf mln\t\tBatch size: %.2lf mln\n\n",
       (double)n_meteoroids / 1000000, (double)BatchSize() / 1000000);
 
-  uint32_t total_threads = config_.threads_per_block * config_.blocks_per_sm * props_.multiProcessorCount;
+  size_t total_threads = config_.threads_per_block * config_.blocks_per_sm * props_.multiProcessorCount;
+
+#ifdef METEORITES_FLOPS_ESTIMATOR
+  size_t flops_per_step;
+  switch (Algorithm())
+  {
+    case NumericalAlgorithm::ONE_STEP_ADAMS:
+      flops_per_step = Adams::FLOPS_PER_ONE_ADAMS_STEP_ITERATION;
+      break;
+    case NumericalAlgorithm::TWO_STEP_ADAMS:
+      flops_per_step = Adams::FLOPS_PER_TWO_ADAMS_STEP_ITERATION;
+      break;
+    case NumericalAlgorithm::THREE_STEP_ADAMS:
+      flops_per_step = Adams::FLOPS_PER_THREE_ADAMS_STEP_ITERATION;
+      break;
+    default:
+      assert(false);
+  }
+  FlopsEstimator flops_estimator(flops_per_step, total_threads);
+#else
+  struct FlopsEstimator
+  {
+    uint64_t *GetStepsCounters() { return nullptr; }
+  };
+  FlopsEstimator flops_estimator;
+#endif
 
   // Prepare device buffers
   MeteoroidsManager meteoroids_manager(m_bests, total_threads, config_.best_meteoroids_per_thread);
@@ -120,7 +147,8 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
              meteoroids_manager.GetDeviceDeviationsBuffer(),
              meteoroids_manager.GetActualThresholdDeviation(),
              config_.meteoroids_per_thread,
-             config_.blocks_per_sm * props_.multiProcessorCount, config_.threads_per_block);
+             config_.blocks_per_sm * props_.multiProcessorCount, config_.threads_per_block,
+             flops_estimator.GetStepsCounters());
         break;
 
       case NumericalAlgorithm::TWO_STEP_ADAMS:
@@ -130,7 +158,8 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
              meteoroids_manager.GetDeviceDeviationsBuffer(),
              meteoroids_manager.GetActualThresholdDeviation(),
              config_.meteoroids_per_thread,
-             config_.blocks_per_sm * props_.multiProcessorCount, config_.threads_per_block);
+             config_.blocks_per_sm * props_.multiProcessorCount, config_.threads_per_block,
+             flops_estimator.GetStepsCounters());
         break;
 
       case NumericalAlgorithm::THREE_STEP_ADAMS:
@@ -140,7 +169,8 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
              meteoroids_manager.GetDeviceDeviationsBuffer(),
              meteoroids_manager.GetActualThresholdDeviation(),
              config_.meteoroids_per_thread,
-             config_.blocks_per_sm * props_.multiProcessorCount, config_.threads_per_block);
+             config_.blocks_per_sm * props_.multiProcessorCount, config_.threads_per_block,
+             flops_estimator.GetStepsCounters());
         break;
 
       default:
@@ -151,8 +181,13 @@ FastCudaSolver::Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m
     HANDLE_ERROR(cudaEventRecord(stop,0));
     HANDLE_ERROR(cudaEventSynchronize(stop));
     HANDLE_ERROR(cudaEventElapsedTime(&elapsedTime, start, stop));
-    printf("Batch time by GPU: %.2lf sec\nSpeed:%.2lf mln/sec\n",
+    printf("Batch time by GPU: %.2lf sec\nSpeed: %.2lf mln/sec\n",
         (double)elapsedTime / 1000, ((double)BatchSize() / 1000000) / ((double)elapsedTime / 1000));
+
+#ifdef METEORITES_FLOPS_ESTIMATOR
+    printf("Achieved TFLOPS: %.3lf\n", flops_estimator.CountTflops((double)elapsedTime / 1000, 3));
+#endif
+
     HANDLE_ERROR(cudaEventDestroy(start));
     HANDLE_ERROR(cudaEventDestroy(stop));
 

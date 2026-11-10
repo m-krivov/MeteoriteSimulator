@@ -36,12 +36,12 @@ MeteoroidsManager::~MeteoroidsManager()
   }
 }
 
-MeteoroidDeviation* MeteoroidsManager::GetDeviceDeviationsBuffer()
+MeteoroidDeviation *MeteoroidsManager::GetDeviceDeviationsBuffer()
 {
   return coalesced_deviations_.get() + m_bests_;
 }
 
-uint64_t* MeteoroidsManager::GetDeviceSeeds()
+uint64_t *MeteoroidsManager::GetDeviceSeeds()
 {
   return device_seeds_.get();
 }

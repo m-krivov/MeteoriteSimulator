@@ -204,7 +204,7 @@ FastAdamsKernel(const uint64_t *seeds,
                 const TrajectoryPoint *ref_points, TrajectoryPoint *context_points,
                 const real dt, const real timeout,
                 MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
-                const uint32_t meteoroids_per_thread)
+                const uint32_t meteoroids_per_thread, uint64_t *steps_counters)
 {
   const uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -259,6 +259,10 @@ FastAdamsKernel(const uint64_t *seeds,
 #endif
     real dev = ComputeL2(points, ref_points, n_timestamps);
     InsertToTopSmallest<BESTS_PER_THREAD>(local_best_meteoroids, { dev, generator.GetOffset() });
+
+#ifdef METEORITES_FLOPS_ESTIMATOR
+    steps_counters[tid] += (uint64_t)(t / dt);
+#endif
   }
 
   for (uint32_t i = 0; i < BESTS_PER_THREAD; i++)
@@ -286,7 +290,7 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
                         const TrajectoryPoint *ref_points, TrajectoryPoint *context_points,
                         const real dt, const real timeout,
                         MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
-                        const uint32_t meteoroids_per_thread)
+                        const uint32_t meteoroids_per_thread, uint64_t *steps_counters)
 {
   const uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -346,6 +350,10 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
       if (atomicAdd(&meteoroids_counter, 1) >= meteoroids_per_thread * blockDim.x)
       { break; }
 
+#ifdef METEORITES_FLOPS_ESTIMATOR
+      steps_counters[tid] += (uint64_t)(t / dt);
+#endif
+
       // Init context
       {
       for (uint32_t i = 0; i < n_timestamps; i++) { points[i] = {0.0, 0.0}; }
@@ -377,14 +385,16 @@ void FastAdamsKernel(const uint64_t *seeds,
                      MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
                      const uint32_t meteoroids_per_thread,
 
-                     const size_t blocks_num, const size_t threads_per_block)
+                     const size_t blocks_num, const size_t threads_per_block,
+                     
+                     uint64_t *steps_counters)
 {
   assert(threads_per_block > 0);
   assert(blocks_num > 0);
 
-  FastAdamsKernel<STEPS, BEST_METEOROIDS_PER_THREAD><<<blocks_num, threads_per_block>>>
+  FastAdamsBalancedKernel<STEPS, BEST_METEOROIDS_PER_THREAD><<<blocks_num, threads_per_block>>>
     (seeds, timestamps, n_timestamps, reference_points, context_points, dt, timeout,
-     global_best_meteoroids, threshold_dev, meteoroids_per_thread);
+     global_best_meteoroids, threshold_dev, meteoroids_per_thread, steps_counters);
 
   HANDLE_ERROR(cudaDeviceSynchronize());
 }
@@ -397,7 +407,7 @@ template void FastAdamsKernel<1u, FastCudaSolverConfig::best_meteoroids_per_thre
      const real dt, const real timeout,
      MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
      const uint32_t meteoroids_per_thread,
-     const size_t blocks_num, const size_t threads_per_block);
+     const size_t blocks_num, const size_t threads_per_block, uint64_t *steps_counters);
 template void FastAdamsKernel<2u, FastCudaSolverConfig::best_meteoroids_per_thread>
     (const uint64_t *seeds,
      const real *timestamps, const uint32_t n_timestamps,
@@ -405,7 +415,7 @@ template void FastAdamsKernel<2u, FastCudaSolverConfig::best_meteoroids_per_thre
      const real dt, const real timeout,
      MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
      const uint32_t meteoroids_per_thread,
-     const size_t blocks_num, const size_t threads_per_block);
+     const size_t blocks_num, const size_t threads_per_block, uint64_t *steps_counters);
 template void FastAdamsKernel<3u, FastCudaSolverConfig::best_meteoroids_per_thread>
     (const uint64_t *seeds,
      const real *timestamps, const uint32_t n_timestamps,
@@ -413,4 +423,4 @@ template void FastAdamsKernel<3u, FastCudaSolverConfig::best_meteoroids_per_thre
      const real dt, const real timeout,
      MeteoroidDeviation *global_best_meteoroids, const real threshold_dev,
      const uint32_t meteoroids_per_thread,
-     const size_t blocks_num, const size_t threads_per_block);
+     const size_t blocks_num, const size_t threads_per_block, uint64_t *steps_counters);
