@@ -260,9 +260,8 @@ FastAdamsKernel(const uint64_t *seeds,
     real dev = ComputeL2(points, ref_points, n_timestamps);
     InsertToTopSmallest<BESTS_PER_THREAD>(local_best_meteoroids, { dev, generator.GetOffset() });
 
-#ifdef METEORITES_FLOPS_ESTIMATOR
-    steps_counters[tid] += (uint64_t)(t / dt);
-#endif
+    if (steps_counters != nullptr)
+    { steps_counters[tid] += (uint64_t)(t / dt); }
   }
 
   for (uint32_t i = 0; i < BESTS_PER_THREAD; i++)
@@ -350,9 +349,8 @@ FastAdamsBalancedKernel(const uint64_t *seeds,
       if (atomicAdd(&meteoroids_counter, 1) >= meteoroids_per_thread * blockDim.x)
       { break; }
 
-#ifdef METEORITES_FLOPS_ESTIMATOR
-      steps_counters[tid] += (uint64_t)(t / dt);
-#endif
+      if (steps_counters != nullptr)
+      { steps_counters[tid] += (uint64_t)(t / dt); }
 
       // Init context
       {

@@ -7,13 +7,6 @@
 namespace Adams
 {
 
-// We add some comments here that explain exactly
-// how the magic constants were derived. Upon merging into `master`,
-// these comments can either be removed or kept for the sake of clarity
-inline constexpr uint32_t FLOPS_PER_ONE_ADAMS_STEP_ITERATION = 52,
-                          FLOPS_PER_TWO_ADAMS_STEP_ITERATION = 67,
-                          FLOPS_PER_THREE_ADAMS_STEP_ITERATION = 77;
-
 // Caches meteoroid's parameters and constants that may be considered as unchangeable values
 // Also precomputes some frequently used expressions
 struct Unchangeable
@@ -34,7 +27,6 @@ struct Unchangeable
   real midsection = (real)0.0;
 
   Unchangeable() = default;
-  // Only 4 flops for the entire trajectory - well within the margin of error
   DEVICE Unchangeable(const VirtualMeteoroid &meteoroid)
     : H{ meteoroid.H },
       Ch{ meteoroid.Ch },
@@ -60,18 +52,13 @@ struct State
   real Gamma   = (real)0.0;
   real h       = (real)0.0;
   real l       = (real)0.0;
-  real M       = (real)0.0;
-
-  State() = default;
-  State(const State &) = default;
-  State &operator =(const State &) = default;
+  real M       = (real)0.0;;
 };
-
 
 // Computes the right part of Stulov's ODE system
 // These values are equal to derivatives
 inline DEVICE
-void ComputeDerivatives(State &dx, const State &x, const Unchangeable &params) // 42 flops
+void ComputeDerivatives(State &dx, const State &x, const Unchangeable &params)
 {
   assert(params.Rho > 0.0f);
   assert(params.H > 1e-3f);
@@ -105,42 +92,70 @@ void ComputeDerivatives(State &dx, const State &x, const Unchangeable &params) /
   dx.M     = alive ? dx_M : (real)0.0;
 }
 
+inline constexpr OperationCounter ComputeDerivatives()
+{
+  OperationCounter res;
+
+  res            += Constants::g();
+  res            += Constants::RhoAtm();
+  res.arithmetic += 0 + 0 + 1 + 0 + 7 + 9 + 1 + 3 + 7;
+  res.division   += 0 + 0 + 0 + 1 + 0 + 1 + 0 + 1 + 0;
+  res.special    += 1 + 1 + 1 + 0 + 0 + 0 + 0 + 0 + 0;
+
+  return res; // 42 flops
+}
 
 // Iteration for one-step Adam's method
 inline DEVICE
 void OneStepIteration(State &x1, State &dx0, const State &x0,
-                      const Unchangeable &params, real dt) // 52 flops
+                      const Unchangeable &params, real dt)
 {
   ComputeDerivatives(dx0, x0, params);
 
-  x1 = { x0.V     + dx0.V     * dt,
-         x0.Gamma + dx0.Gamma * dt,
-         x0.h     + dx0.h     * dt,
-         x0.l     + dx0.l     * dt,
-         x0.M     + dx0.M     * dt }; // 10
+  x1 = { .V     = x0.V     + dx0.V     * dt,
+         .Gamma = x0.Gamma + dx0.Gamma * dt,
+         .h     = x0.h     + dx0.h     * dt,
+         .l     = x0.l     + dx0.l     * dt,
+         .M     = x0.M     + dx0.M     * dt };
+}
+
+inline constexpr OperationCounter OneStepIteration()
+{
+  OperationCounter res;
+  res += ComputeDerivatives();
+  res.arithmetic += 10;
+  return res; // 52 flops
 }
 
 // Iteration for two-step Adam's method
 inline DEVICE
 void TwoStepIteration(State &x2, State &dx1, const State &x1, const State &dx0,
-                      const Unchangeable &params, real dt) // 67 flops
+                      const Unchangeable &params, real dt)
 {
   constexpr auto c1 =  (real)1.5;
   constexpr auto c0 = -(real)0.5;
 
   ComputeDerivatives(dx1, x1, params);
 
-  x2 = { x1.V     + ( c1 * dx1.V     + c0 * dx0.V     ) * dt,
-         x1.Gamma + ( c1 * dx1.Gamma + c0 * dx0.Gamma ) * dt,
-         x1.h     + ( c1 * dx1.h     + c0 * dx0.h     ) * dt,
-         x1.l     + ( c1 * dx1.l     + c0 * dx0.l     ) * dt,
-         x1.M     + ( c1 * dx1.M     + c0 * dx0.M     ) * dt }; // 25
+  x2 = { .V     = x1.V     + ( c1 * dx1.V     + c0 * dx0.V     ) * dt,
+         .Gamma = x1.Gamma + ( c1 * dx1.Gamma + c0 * dx0.Gamma ) * dt,
+         .h     = x1.h     + ( c1 * dx1.h     + c0 * dx0.h     ) * dt,
+         .l     = x1.l     + ( c1 * dx1.l     + c0 * dx0.l     ) * dt,
+         .M     = x1.M     + ( c1 * dx1.M     + c0 * dx0.M     ) * dt };
+}
+
+inline constexpr OperationCounter TwoStepIteration()
+{
+  OperationCounter res;
+  res += ComputeDerivatives();
+  res.arithmetic += 25;
+  return res; // 67 flops
 }
 
 // Iteration for three-step Adam's method
 inline DEVICE
 void ThreeStepIteration(State &x3, State &dx2, const State &x2, const State &dx1, const State &dx0,
-                        const Unchangeable &params, real dt) // 77 flops
+                        const Unchangeable &params, real dt)
 {
   constexpr auto c2 =  (real)23 / 12;
   constexpr auto c1 = -(real)16 / 12;
@@ -148,11 +163,19 @@ void ThreeStepIteration(State &x3, State &dx2, const State &x2, const State &dx1
 
   ComputeDerivatives(dx2, x2, params);
   
-  x3 = { x2.V     + ( c2 * dx2.V     + c1 * dx1.V     + c0 * dx0.V     ) * dt,
-         x2.Gamma + ( c2 * dx2.Gamma + c1 * dx1.Gamma + c0 * dx0.Gamma ) * dt,
-         x2.h     + ( c2 * dx2.h     + c1 * dx1.h     + c0 * dx0.h     ) * dt,
-         x2.l     + ( c2 * dx2.l     + c1 * dx1.l     + c0 * dx0.l     ) * dt,
-         x2.M     + ( c2 * dx2.M     + c1 * dx1.M     + c0 * dx0.M     ) * dt }; // 35
+  x3 = { .V     = x2.V     + ( c2 * dx2.V     + c1 * dx1.V     + c0 * dx0.V     ) * dt,
+         .Gamma = x2.Gamma + ( c2 * dx2.Gamma + c1 * dx1.Gamma + c0 * dx0.Gamma ) * dt,
+         .h     = x2.h     + ( c2 * dx2.h     + c1 * dx1.h     + c0 * dx0.h     ) * dt,
+         .l     = x2.l     + ( c2 * dx2.l     + c1 * dx1.l     + c0 * dx0.l     ) * dt,
+         .M     = x2.M     + ( c2 * dx2.M     + c1 * dx1.M     + c0 * dx0.M     ) * dt };
+}
+
+inline constexpr OperationCounter ThreeStepIteration()
+{
+  OperationCounter res;
+  res += ComputeDerivatives();
+  res.arithmetic += 35;
+  return res; // 77 flops
 }
 
 // Performs uni-step iteration of Adams' method using a cycled buffer with derivatives

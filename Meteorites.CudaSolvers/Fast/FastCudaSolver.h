@@ -7,7 +7,7 @@
 // Settings for FastCudaSolver
 struct FastCudaSolverConfig
 {
-  uint32_t meteoroids_per_thread = 1024 * 8;//32
+  uint32_t meteoroids_per_thread = 1024 * 8;
   
   // How many CUDA threads must be spawned per each block
   // Will be used to configure the grid for the CUDA kernel
@@ -30,7 +30,7 @@ class FastCudaSolver
 {
   public:
     FastCudaSolver(FastCudaSolverConfig config = FastCudaSolverConfig());
-    ~FastCudaSolver();
+    ~FastCudaSolver() = default;
 
     size_t BatchSize() const;
     NumericalAlgorithm Algorithm() const { return algorithm_; }
@@ -38,7 +38,7 @@ class FastCudaSolver
     void Configure(NumericalAlgorithm alg, real dt, real timeout);
 
     std::vector<std::pair<VirtualMeteoroid, real> >
-    Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m_bests);
+    Solve(const IMeteorite &meteorite, size_t n_meteoroids, size_t m_bests, double *flops = nullptr);
 
   private:
     NumericalAlgorithm algorithm_ = NumericalAlgorithm::TWO_STEP_ADAMS;
@@ -48,9 +48,4 @@ class FastCudaSolver
 
     cudaDeviceProp             props_{};
     const FastCudaSolverConfig config_{};
-
-    CudaPtr<TrajectoryPoint>    context_points_;
-    CudaPtr<TrajectoryPoint>    reference_points_;
-    CudaPtr<real>               timestamps_;
-    uint32_t                    n_timestamps_{0};
 };

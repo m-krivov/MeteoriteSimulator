@@ -191,7 +191,8 @@ int main()
     {
       std::unique_ptr<FastCudaSolver> solver = std::make_unique<FastCudaSolver>();
       solver->Configure(STAGE1_METHOD, STAGE1_DT, t_end + (real)0.1);
-      auto meteoroids = solver->Solve(*meteorite, STAGE1_N_TOTAL, STAGE1_N_TOP);
+      double flops{};
+      auto meteoroids = solver->Solve(*meteorite, STAGE1_N_TOTAL, STAGE1_N_TOP, &flops);
     
       assert(meteoroids.size() == STAGE1_N_TOP);
       for (const auto &meteoroid : meteoroids) {
